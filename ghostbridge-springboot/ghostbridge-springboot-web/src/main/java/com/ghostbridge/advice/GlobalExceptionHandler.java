@@ -128,12 +128,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static HttpStatus statusFor(ErrorCode code) {
         return switch (code) {
-            case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            case BUSINESS_RULE_VIOLATION -> HttpStatus.UNPROCESSABLE_ENTITY;
-            case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
+            case VALIDATION_ERROR, INVALID_INPUT, MALFORMED_REQUEST -> HttpStatus.BAD_REQUEST;
             case AUTHENTICATION_REQUIRED -> HttpStatus.UNAUTHORIZED;
+            case ACCESS_DENIED -> HttpStatus.FORBIDDEN;
+            case RESOURCE_NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case PAYLOAD_TOO_LARGE -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case BUSINESS_RULE_VIOLATION -> HttpStatus.UNPROCESSABLE_ENTITY;
+            case RATE_LIMITED, QUOTA_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
             case INTERNAL_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-            default -> HttpStatus.BAD_REQUEST;
+            case UPSTREAM_ERROR -> HttpStatus.BAD_GATEWAY;
+            case UPSTREAM_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case UPSTREAM_TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT;
         };
     }
 }

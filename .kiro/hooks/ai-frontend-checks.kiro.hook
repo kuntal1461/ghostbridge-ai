@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "AI Frontend type and lint checks",
+  "description": "On AI frontend source edits, run the type check (and lint once the script exists) and report failures. Report only.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["ghostbridge-ai-module/ghostbridge-ai-frontend/src/**/*.ts", "ghostbridge-ai-module/ghostbridge-ai-frontend/src/**/*.tsx"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "npm --prefix ghostbridge-ai-module/ghostbridge-ai-frontend run typecheck"
+  }
+}

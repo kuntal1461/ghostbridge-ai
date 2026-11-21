@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "AI Core focused tests",
+  "description": "On AI core source or test edits, run the focused ai-core test build and report the result. Report only; never modifies files.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["ghostbridge-ai-module/ghostbridge-ai-core/src/**/*.java"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "mvn -q -pl ghostbridge-ai-module/ghostbridge-ai-core -am test"
+  }
+}

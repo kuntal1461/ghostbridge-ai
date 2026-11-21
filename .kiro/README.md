@@ -2,6 +2,18 @@
 
 This directory documents how GhostBridge AI is developed with Kiro. It is intentionally committed to the repository and must not be ignored.
 
+## Evidence log (accurate record of what was actually done)
+
+| Artifact | Created with | Run/validated in Kiro? |
+|---|---|---|
+| `specs/ghostbridge-ai/{requirements,design,tasks}.md` | Claude Code (Kiro spec format) | **No** — not opened in the Kiro IDE |
+| `steering/*.md` (`inclusion: always` and `fileMatch`) | Claude Code (Kiro steering format) | **No** — not loaded by Kiro yet |
+| `hooks/*.kiro.hook` (3 `fileEdited` + 1 `postTaskExecution`) | Claude Code, written from the documented hook schema | **No** — not loaded in Kiro; schema unverified until opened in Kiro |
+| `agents/*` reviewer prompts extended with AI-module scope and steering/spec resources | Claude Code | **No** — Kiro CLI/IDE not installed on this machine |
+| M2 security/quality reviews (`tasks/GB-AI-001-…/*-review.md`) | Independent Claude Code subagents applying the Kiro reviewer prompts | **No** — these are not Kiro agent runs |
+
+Update this table only with real Kiro runs (spec task execution, hook triggers, agent runs) and their results.
+
 ## Planned Evidence
 
 - `specs/ghostbridge-ai/requirements.md` - Functional and non-functional requirements.

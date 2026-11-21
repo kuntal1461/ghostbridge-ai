@@ -1,0 +1,1 @@
+{ "name": "ms", "version": 1, "description": "d", "system": "You are a helper.", "user": "Hello {{a}}", "variables": ["a"], "schema": "does-not-exist" }

@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Spec task completion -> task documentation",
+  "description": "After a spec task finishes, compare the claim with verification evidence and propose updates to the GB-AI-001 task documents. Never marks anything complete without evidence.",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A spec task just finished. Read ghostbridge-ai-module/tasks/GB-AI-001-ai-framework-setup/{tasks,milestone,implementation,changelog}.md and the changed files. Report which checklist items now have verification evidence (test output, build result) and propose the exact edits. Only tick an item when its acceptance criteria were actually verified; if tests failed or were not run, say so and leave it unchecked. Do not edit .kiro/hooks, source files or review reports, and do not approve your own work."
+  }
+}

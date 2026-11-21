@@ -36,6 +36,7 @@ These rules are mandatory for every module. Layout and module roles: [PROJECT_ST
 - Use specific exceptions extending `GhostBridgeException`. Errors are returned as `ApiError` by the exception advice in `*-web`.
 - Classes: `PascalCase`. Methods and fields: `camelCase`. Constants: `UPPER_SNAKE_CASE`. Packages: lowercase.
 - One public top-level type per file. Keep files small and focused.
+- **Literals classes** (shared constants such as `GhostBridgeAiLiterals`, one `final` class per project with a private constructor, in `com.ghostbridge.constants`): import the class normally (`import com.ghostbridge.constants.GhostBridgeAiLiterals;`) and reference constants through the class name (`GhostBridgeAiLiterals.UNTRUSTED_OPEN`). Never use static imports of literals and never use wildcard imports (`*`, including static wildcards). This applies to every project and to all future literals classes. Runtime configuration, credentials and client-facing messages do not belong in literals classes.
 
 ## 4. Project structure and folder naming compliance
 
@@ -43,7 +44,7 @@ These rules are mandatory for every module. Layout and module roles: [PROJECT_ST
 - Maven modules and folders are lowercase, hyphen-separated: `ghostbridge-<project>-<layer>` (for example `ghostbridge-springboot-core`).
 - Layers are named exactly `core`, `web`, `frontend`. No other layer names.
 - **`com.ghostbridge` is the only Java base namespace in every project and module.** Never add project or layer levels: no `.springboot`, `.ai`, `.app`, `.core`, `.web` (so not `com.ghostbridge.springboot.config` and not `com.ghostbridge.ai.web.controller`).
-- Organize classes by function directly under it: `com.ghostbridge.config`, `entity`, `repository`, `service`, `service.impl`, `controller`, `restcontroller`, `advice`, `filter`, `security`, `dto`, `exception`, `util`.
+- Organize classes by function directly under it: `com.ghostbridge.config`, `entity`, `repository`, `service`, `service.impl`, `controller`, `restcontroller`, `advice`, `filter`, `security`, `dto`, `exception`, `util`, `constants`.
 - Core modules hold `config`, `entity`, `repository`, `service`, `service.impl`, `dto`, `util`, `exception`. Web modules hold `controller`, `restcontroller`, `advice`, `filter`, `security`, `dto`, `config`. Layer separation is enforced by the Maven module, not by the package name.
 - Several modules may contribute to the same functional package (for example `com.ghostbridge.service`), so **simple class names must be unique across the whole repository**. Prefix with the domain when needed (`AiPromptService`, `SpringBootCorsConfig`), so there is never a duplicate fully qualified name.
 - Spring scanning (component, entity, repository) starts at `com.ghostbridge`. The application class lives directly in `com.ghostbridge` and uses the default scan; do not set narrower `scanBasePackages`, `@EntityScan` or `@EnableJpaRepositories` packages.

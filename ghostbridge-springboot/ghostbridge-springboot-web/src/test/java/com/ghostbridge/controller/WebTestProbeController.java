@@ -1,11 +1,14 @@
 package com.ghostbridge.controller;
 
 import com.ghostbridge.exception.BusinessException;
+import com.ghostbridge.exception.ErrorCode;
+import com.ghostbridge.exception.GhostBridgeException;
 import com.ghostbridge.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,5 +56,10 @@ class WebTestProbeController {
     @GetMapping("/api/business")
     String business() {
         throw new BusinessException("Cannot do that");
+    }
+
+    @GetMapping("/api/error-code/{code}")
+    String errorCode(@PathVariable ErrorCode code) {
+        throw new GhostBridgeException(code, "client-safe message");
     }
 }

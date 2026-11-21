@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "AI Web focused tests",
+  "description": "On AI web source or test edits, run the focused ai-web test build (validation and controller tests) and report the result. Report only.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["ghostbridge-ai-module/ghostbridge-ai-web/src/**/*.java"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "mvn -q -pl ghostbridge-ai-module/ghostbridge-ai-web -am test"
+  }
+}
