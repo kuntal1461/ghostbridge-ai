@@ -2,20 +2,69 @@
   "name": "ghostbridge-security-reviewer",
   "description": "Independent security reviewer for GhostBridge AI. Reviews code and configuration, writes security-review.md into the task folder. Never edits source code.",
   "prompt": "file://./prompts/ghostbridge-security-reviewer.md",
-  "tools": ["read", "write", "shell"],
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
   "permissions": {
     "rules": [
-      { "capability": "fs_read", "match": ["**"], "effect": "allow" },
-      { "capability": "fs_write", "match": ["**/tasks/**/security-review.md"], "effect": "allow" },
-      { "capability": "fs_write", "match": ["**"], "effect": "deny", "exclude": ["**/tasks/**/security-review.md"] },
-      { "capability": "shell", "match": ["git diff", "git log", "git status", "grep", "mvn dependency:tree", "mvn -q dependency:tree"], "effect": "allow" },
-      { "capability": "shell", "match": ["rm", "sudo", "curl", "wget", "git push", "git commit"], "effect": "deny" }
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "**/tasks/**/security-review.md"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "**"
+        ],
+        "effect": "deny",
+        "exclude": [
+          "**/tasks/**/security-review.md"
+        ]
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "git diff",
+          "git log",
+          "git status",
+          "grep",
+          "mvn dependency:tree",
+          "mvn -q dependency:tree"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "rm",
+          "sudo",
+          "curl",
+          "wget",
+          "git push",
+          "git commit"
+        ],
+        "effect": "deny"
+      }
     ]
   },
   "resources": [
     "file://rules/rules.md",
     "file://doc-architecture/PROJECT_STRUCTURE.md",
-    "file://doc-architecture/architecture.md"
+    "file://doc-architecture/architecture.md",
+    "file://.kiro/steering/*.md",
+    "file://.kiro/specs/ghostbridge-ai/*.md"
   ],
   "welcomeMessage": "ghostbridge-security-reviewer ready. Give me a task folder (for example ghostbridge-springboot/tasks/GB-SPRINGBOOT-001-centralized-framework-setup) and I will review it read-only."
 }

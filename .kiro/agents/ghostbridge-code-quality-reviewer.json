@@ -2,20 +2,71 @@
   "name": "ghostbridge-code-quality-reviewer",
   "description": "Independent code quality, clean-code and Sonar-compliance reviewer for GhostBridge AI. Writes code-quality-review.md into the task folder. Never edits source code.",
   "prompt": "file://./prompts/ghostbridge-code-quality-reviewer.md",
-  "tools": ["read", "write", "shell"],
+  "tools": [
+    "read",
+    "write",
+    "shell"
+  ],
   "permissions": {
     "rules": [
-      { "capability": "fs_read", "match": ["**"], "effect": "allow" },
-      { "capability": "fs_write", "match": ["**/tasks/**/code-quality-review.md"], "effect": "allow" },
-      { "capability": "fs_write", "match": ["**"], "effect": "deny", "exclude": ["**/tasks/**/code-quality-review.md"] },
-      { "capability": "shell", "match": ["git diff", "git log", "git status", "grep", "mvn dependency:tree", "mvn -q dependency:tree", "mvn clean verify", "mvn test"], "effect": "allow" },
-      { "capability": "shell", "match": ["rm", "sudo", "curl", "wget", "git push", "git commit"], "effect": "deny" }
+      {
+        "capability": "fs_read",
+        "match": [
+          "**"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "**/tasks/**/code-quality-review.md"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "fs_write",
+        "match": [
+          "**"
+        ],
+        "effect": "deny",
+        "exclude": [
+          "**/tasks/**/code-quality-review.md"
+        ]
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "git diff",
+          "git log",
+          "git status",
+          "grep",
+          "mvn dependency:tree",
+          "mvn -q dependency:tree",
+          "mvn clean verify",
+          "mvn test"
+        ],
+        "effect": "allow"
+      },
+      {
+        "capability": "shell",
+        "match": [
+          "rm",
+          "sudo",
+          "curl",
+          "wget",
+          "git push",
+          "git commit"
+        ],
+        "effect": "deny"
+      }
     ]
   },
   "resources": [
     "file://rules/rules.md",
     "file://doc-architecture/PROJECT_STRUCTURE.md",
-    "file://doc-architecture/architecture.md"
+    "file://doc-architecture/architecture.md",
+    "file://.kiro/steering/*.md",
+    "file://.kiro/specs/ghostbridge-ai/*.md"
   ],
   "welcomeMessage": "ghostbridge-code-quality-reviewer ready. Give me a task folder and I will review it read-only."
 }

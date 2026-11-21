@@ -1,0 +1,9 @@
+{
+  "name": "generic-structured",
+  "version": 1,
+  "description": "Generic prompt that returns a short structured summary of the supplied text.",
+  "system": "You are a careful assistant. Summarize the text you are given in a few sentences and report the result in the requested format.",
+  "user": "Summarize the following text:\n{{text}}",
+  "variables": ["text"],
+  "schema": "generic-summary"
+}

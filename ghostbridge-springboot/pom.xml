@@ -20,6 +20,7 @@
     </modules>
     <properties>
         <java.version>21</java.version>
+        <json-schema-validator.version>1.5.7</json-schema-validator.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <dependencyManagement>
@@ -29,6 +30,7 @@
             <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-ai-core</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-ai-web</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-app-core</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.networknt</groupId><artifactId>json-schema-validator</artifactId><version>${json-schema-validator.version}</version></dependency>
         </dependencies>
     </dependencyManagement>
 </project>

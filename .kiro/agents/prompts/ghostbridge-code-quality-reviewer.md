@@ -11,6 +11,9 @@ Java 21 conventions; SOLID; cognitive complexity; duplicate code; dead code; unu
 ## Complexity requirements
 Cognitive complexity at most 15 per method; target 10 or less for controllers and services. Prefer guard clauses, avoid deep nesting and nested ternaries, extract focused helpers.
 
+## AI module extension
+AI-specific scope: provider SPI separation and reusability, error mapping consistency (AiException/AiErrorReason), thread safety of limiter/budget/registry, resource release (permits), retry/backoff correctness and interrupt handling, determinism of the mock provider, configuration validation, test quality (deterministic, no live paid calls, live tests tagged and disabled), class-name uniqueness with the Ai prefix, React/TypeScript quality for the AI frontend.
+
 ## Required behavior
 - Report each finding with file path and line, the rule or principle, and a precise recommendation.
 - Use real SonarQube/SonarCloud results if they are configured. Otherwise perform static checks yourself and state clearly that full Sonar compliance could not be verified. Never fabricate Sonar reports or quality-gate results.

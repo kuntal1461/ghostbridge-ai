@@ -76,7 +76,7 @@ ghostbridge-app-core  <-  ghostbridge-app-web (also uses ghostbridge-springboot-
 |---|---|
 | `ghostbridge-springboot-core` | `config`, `exception`, `util` (add `entity`, `repository`, `service`, `service.impl`, `dto` only when code needs them) |
 | `ghostbridge-springboot-web` | `advice`, `config`, `filter`, `security`, `util` (add `controller`, `restcontroller`, `dto` only when needed) |
-| `ghostbridge-ai-core` | functional packages as needed (none created yet) |
+| `ghostbridge-ai-core` | `config`, `constants`, `dto`, `service`, `service.impl`, `exception`, `util`; resources `prompts/`, `ai-schemas/` |
 | `ghostbridge-ai-web` | `restcontroller` (more as needed) |
 | `ghostbridge-app-core` | `entity`, `repository`, `service`, `service.impl`, `dto`, `util`, `exception` |
 | `ghostbridge-app-web` | `controller`, `restcontroller` |
@@ -105,7 +105,7 @@ Modules share package names, so class names must be unique repository-wide. See 
 - **GhostBridge AI Module** is an isolated AI subsystem, with its own core, web and frontend.
 - **GhostBridge App** integrates these modules and implements the actual SOAP-to-REST workflow.
 
-> Status: `ghostbridge-springboot` now contains the centralized infrastructure (GB-SPRINGBOOT-001). The AI module, the app modules and all frontends remain structure only; `ghostbridge-app-web` has no main class yet.
+> Status: `ghostbridge-springboot` now contains the centralized infrastructure (GB-SPRINGBOOT-001). `ghostbridge-ai-core` now holds the provider-neutral AI foundation (GB-AI-001 M2; mock provider only, Bedrock adapter planned for M3). `ghostbridge-ai-web`, the app modules and all frontends remain structure only; `ghostbridge-app-web` has no main class yet.
 
 ## Rules
 

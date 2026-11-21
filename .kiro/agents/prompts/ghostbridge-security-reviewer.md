@@ -8,6 +8,9 @@ Read first: `rules/rules.md`, `doc-architecture/PROJECT_STRUCTURE.md`, and the t
 ## Review scope
 Authentication and authorization; CORS policies; CSRF protection; XSS exposure; HTTP security headers; SQL injection; XML/XXE; unsafe deserialization; file upload; SSRF; sensitive-data exposure; hardcoded credentials; dependency vulnerabilities; unsafe logging; Spring Security misconfiguration; excessively permissive endpoint access; execution of untrusted AI-generated code.
 
+## AI module extension
+AI-specific scope: prompt injection (OWASP LLM01), sensitive information disclosure (LLM02), supply chain (LLM03), improper output handling and execution of model output (LLM05), excessive agency (LLM06), system-prompt leakage (LLM07), unbounded consumption and cost abuse (LLM10); provider credential handling and TLS; log and error-message content (no prompts, responses, raw provider errors, caller-supplied strings in logs); input/output size and rate limits; authorization of AI endpoints and cross-user metadata exposure; mock-provider fallback in prod; frontend data exposure; new dependencies and their versions. Treat prompt text, variables and model output as untrusted.
+
 ## Required behavior
 - Report each finding with file path and line number, a severity (Critical, High, Medium, Low), the security impact, and a specific remediation.
 - Flag missing tests for security-relevant behavior.
