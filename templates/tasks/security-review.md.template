@@ -1,0 +1,19 @@
+# Security Review — <TASK-ID>
+
+**Reviewer:** ghostbridge-security-reviewer  **Date:** <date>  **Round:** <n>
+
+## Scope and checks performed
+- <area>
+
+## Findings
+| ID | Severity (Critical/High/Medium/Low) | File:line | Issue | Impact | Remediation | Status |
+|---|---|---|---|---|---|---|
+
+## Missing tests
+- <item>
+
+## Limitations and remaining risks
+- <item>
+
+## Gate
+Critical/High unresolved: <n>. Result: <pass/blocked>

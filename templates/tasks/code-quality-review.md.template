@@ -1,0 +1,16 @@
+# Code Quality Review — <TASK-ID>
+
+**Reviewer:** ghostbridge-code-quality-reviewer  **Date:** <date>  **Round:** <n>
+
+## Scope and checks performed
+- <area>
+
+## Sonar status
+<actual SonarQube/SonarCloud results, or "not configured; full Sonar compliance not verified">
+
+## Findings
+| ID | Severity | File:line | Rule / principle | Issue | Recommendation | Status |
+|---|---|---|---|---|---|---|
+
+## Limitations
+- <item>

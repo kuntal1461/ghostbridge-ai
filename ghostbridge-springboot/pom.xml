@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.7</version>
+        <relativePath/>
+    </parent>
+    <groupId>com.ghostbridge</groupId>
+    <artifactId>ghostbridge-springboot</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>GhostBridge Spring Boot</name>
+    <description>Central Spring Boot version, dependency management and build plugins for every GhostBridge project.</description>
+    <modules>
+        <module>ghostbridge-springboot-core</module>
+        <module>ghostbridge-springboot-web</module>
+    </modules>
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-springboot-core</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-springboot-web</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-ai-core</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-ai-web</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-app-core</artifactId><version>${project.version}</version></dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

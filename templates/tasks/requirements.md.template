@@ -1,0 +1,25 @@
+# Requirements — <TASK-ID>
+
+## Objective
+<one paragraph>
+
+## Functional requirements
+| ID | Requirement |
+|---|---|
+| FR-1 | <text> |
+
+## Non-functional requirements
+| ID | Requirement |
+|---|---|
+| NFR-1 | <text> |
+
+## Security requirements
+| ID | Requirement |
+|---|---|
+| SEC-1 | <text> |
+
+## Out of scope
+- <item>
+
+## Acceptance criteria
+- [ ] <verifiable criterion>

@@ -1,0 +1,13 @@
+# Milestones — <TASK-ID>
+
+| # | Milestone | Acceptance criteria | Status | Verified by |
+|---|---|---|---|---|
+| M1 | <name> | <criteria> | Not started | |
+
+Status values: Not started, In progress, Blocked, Complete (only after verification).
+
+## Blockers
+- <none>
+
+## Verification results
+- <date, command, outcome>

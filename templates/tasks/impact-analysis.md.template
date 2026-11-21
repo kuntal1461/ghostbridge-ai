@@ -1,0 +1,17 @@
+# Impact Analysis — <TASK-ID>
+
+## Affected projects and consumers
+| Project / module | Impact |
+|---|---|
+
+## Runtime behaviour changes
+- <item>
+
+## Compatibility risks
+- <item>
+
+## Potential breaking changes
+- <item or "None">
+
+## Mitigations
+- <item>

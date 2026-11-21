@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.ghostbridge</groupId>
+        <artifactId>ghostbridge-app</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+    <artifactId>ghostbridge-app-web</artifactId>
+    <name>GhostBridge App Web</name>
+    <properties>
+        <!-- No main class yet. Remove this property once the application class is added. -->
+        <spring-boot.repackage.skip>true</spring-boot.repackage.skip>
+    </properties>
+    <dependencies>
+        <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-app-core</artifactId></dependency>
+        <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-springboot-web</artifactId></dependency>
+        <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-ai-web</artifactId></dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

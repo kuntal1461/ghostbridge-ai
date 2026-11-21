@@ -1,0 +1,20 @@
+# Implementation Plan — <TASK-ID>
+
+## Phases
+| Phase | Goal | Deliverables |
+|---|---|---|
+| 1 | <goal> | <deliverables> |
+
+## Affected modules and files
+| Module | Files (planned) | Change |
+|---|---|---|
+
+## Technical decisions
+| Decision | Alternatives considered | Reason |
+|---|---|---|
+
+## Dependencies (Maven / runtime)
+- <dependency and why it is justified>
+
+## Rollback considerations
+- <how to undo each phase>

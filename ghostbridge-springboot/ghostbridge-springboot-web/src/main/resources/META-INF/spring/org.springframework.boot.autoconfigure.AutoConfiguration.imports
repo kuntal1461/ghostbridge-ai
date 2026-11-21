@@ -1,0 +1,3 @@
+com.ghostbridge.config.GhostBridgeWebAutoConfiguration
+com.ghostbridge.config.GhostBridgeSecurityAutoConfiguration
+com.ghostbridge.config.GhostBridgeRestClientAutoConfiguration

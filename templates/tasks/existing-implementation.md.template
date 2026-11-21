@@ -1,0 +1,16 @@
+# Existing Implementation — <TASK-ID>
+
+## Scope analysed
+<modules, packages, configuration files reviewed>
+
+## Current behaviour
+<how the relevant area works today; configuration, security, CORS, exceptions, logging, dependencies>
+
+## Functionality that must be preserved
+- <item>
+
+## Gaps and risks found
+- <item>
+
+## Evidence
+<file paths, commands run, date>

@@ -1,0 +1,9 @@
+# Test Cases — <TASK-ID>
+
+| ID | Type (positive/negative/integration/security) | Scenario | Expected result | Test class | Status |
+|---|---|---|---|---|---|
+| TC-1 | positive | <scenario> | <expected> | <class> | Not run |
+
+## Execution log
+| Date | Command | Result |
+|---|---|---|
