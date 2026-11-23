@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# GhostBridge AI pre-commit secret guard. Enable once per clone:
+#   git config core.hooksPath .githooks
+# Blocks the commit when a credential-like value or a secret-bearing file is staged.
+# It NEVER prints a matched value, only file:line. This hook is advisory (git commit --no-verify skips it):
+# a CI / server-side secret scan is still required for real protection.
+# The built-in scan is a regex fallback and is weaker than a real scanner; when gitleaks is installed it also runs.
+set -u -o pipefail
+
+root="$(git rev-parse --show-toplevel)" || exit 1
+allowlist="$root/.githooks/secret-scan-allowlist"   # whole files only (synthetic test fixtures)
+blocked=0
+
+# 1) secret-bearing file names (always checked, also when gitleaks is installed)
+names="$(git -c core.quotepath=false diff --cached --name-only -z --diff-filter=ACMR | tr '\0' '\n')" || {
+  echo "pre-commit: could not read the staged file list; commit blocked (fail closed)." >&2
+  exit 1
+}
+while IFS= read -r file; do
+  [ -z "$file" ] && continue
+  case "$file" in
+    .env.example|*/.env.example) continue ;;
+    .env|.env.*|*/.env|*/.env.*|*.pem|*.key|*.p12|*.jks|*.pfx|.envrc|*/.envrc|secrets/*|*/secrets/*|application-local.*|*/application-local.*)
+      echo "pre-commit: refusing to commit secret-bearing file: $file" >&2
+      blocked=1 ;;
+  esac
+done <<< "$names"
+
+# 2) credential-like added lines. Token shapes are case-sensitive; key/secret/token/password assignments are case-insensitive
+#    (so OLLAMA_API_KEY=<value> is caught). A filled-in value in .env.example is also refused.
+diff="$(git -c core.quotepath=false diff --cached -U0 --no-color --diff-filter=ACMR)" || {
+  echo "pre-commit: could not read the staged diff; commit blocked (fail closed)." >&2
+  exit 1
+}
+tokens='(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|[Bb]earer[ ]+[A-Za-z0-9._~+/=-]{20,})'
+assign='(api[_-]?key|secret|token|passwd|password|credential)["'"'"' ]*[:=]["'"'"' ]*[a-z0-9._~+/=-]{16,}'
+
+hits="$(printf '%s\n' "$diff" | awk -v tokens="$tokens" -v assign="$assign" '
+  /^diff --git / { in_hunk = 0; next }
+  /^\+\+\+ / && !in_hunk { file = ($2 == "/dev/null") ? "" : substr($0, 7); next }
+  /^@@/ { in_hunk = 1; split($3, a, ","); line = substr(a[1], 2) + 0; next }
+  in_hunk && /^\+/ {
+    text = substr($0, 2)
+    if (text ~ tokens || tolower(text) ~ assign) { print file ":" line }
+    else if (file ~ /\.env\.example$/ && text ~ /^[A-Za-z_]*([Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd])[A-Za-z_]*=.+/) { print file ":" line }
+    line++
+  }
+')"
+
+if [ -n "$hits" ]; then
+  while IFS= read -r hit; do
+    path="${hit%:*}"
+    if [ -f "$allowlist" ] && grep -qxF -- "$path" "$allowlist"; then
+      continue
+    fi
+    echo "pre-commit: possible credential at $hit (value hidden)" >&2
+    blocked=1
+  done <<< "$hits"
+fi
+
+# 3) gitleaks, when installed, must also pass (its result is combined with the checks above, never replaces them)
+if command -v gitleaks >/dev/null 2>&1; then
+  if gitleaks --help 2>&1 | grep -qE '^[[:space:]]+git[[:space:]]'; then
+    gitleaks git --staged --redact --no-banner >/dev/null 2>&1 || {
+      echo "pre-commit: gitleaks reported a possible credential or failed (details hidden)." >&2
+      blocked=1
+    }
+  else
+    gitleaks protect --staged --redact --no-banner >/dev/null 2>&1 || {
+      echo "pre-commit: gitleaks reported a possible credential or failed (details hidden)." >&2
+      blocked=1
+    }
+  fi
+fi
+
+if [ "$blocked" -ne 0 ]; then
+  echo "pre-commit: commit blocked. Remove the secret; if it was real, revoke/rotate it. Do not bypass this check." >&2
+  exit 1
+fi
+exit 0

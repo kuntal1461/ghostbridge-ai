@@ -6,6 +6,7 @@ import com.ghostbridge.exception.AiErrorReason;
 import com.ghostbridge.exception.AiException;
 
 import java.time.Clock;
+import java.time.Duration;
 
 /** Optional fixed-window token budget. Counts only usage the provider actually reported; never estimates. */
 public class AiTokenBudget {
@@ -27,7 +28,8 @@ public class AiTokenBudget {
         }
         rollWindow();
         if (usedTokens >= settings.maxTokens()) {
-            throw new AiException(AiErrorReason.BUDGET_EXHAUSTED, "AI token budget is exhausted");
+            long remaining = windowStartMillis + settings.window().toMillis() - clock.millis();
+            throw new AiException(AiErrorReason.BUDGET_EXHAUSTED, "AI token budget is exhausted", Duration.ofMillis(remaining));
         }
     }
 

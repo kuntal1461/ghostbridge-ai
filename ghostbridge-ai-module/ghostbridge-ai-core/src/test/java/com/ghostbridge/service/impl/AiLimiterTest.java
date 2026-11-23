@@ -118,4 +118,23 @@ class AiLimiterTest {
         }
         assertRateLimited(limiter);
     }
+
+    @Test
+    void rateLimitReportsTheRemainingWindowAsRetryAfter() {
+        TestClock clock = new TestClock();
+        AiLimiter limiter = new AiLimiter(new AiProperties.RateLimit(1, 10), clock);
+        limiter.acquire().close();
+        clock.advance(Duration.ofSeconds(20));
+        assertThatThrownBy(limiter::acquire).isInstanceOfSatisfying(AiException.class,
+                e -> assertThat(e.getRetryAfter()).contains(Duration.ofSeconds(40)));
+    }
+
+    @Test
+    void concurrencyRejectionHasNoRetryAfterBecauseItIsUnknown() {
+        AiLimiter limiter = new AiLimiter(new AiProperties.RateLimit(100, 1), Clock.systemUTC());
+        AiLimiter.Permit held = limiter.acquire();
+        assertThatThrownBy(limiter::acquire).isInstanceOfSatisfying(AiException.class,
+                e -> assertThat(e.getRetryAfter()).isEmpty());
+        held.close();
+    }
 }

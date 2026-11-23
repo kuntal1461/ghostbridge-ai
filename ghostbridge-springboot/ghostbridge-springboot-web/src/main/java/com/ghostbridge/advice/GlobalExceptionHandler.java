@@ -126,7 +126,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return status.is5xxServerError() ? ErrorCode.INTERNAL_ERROR : ErrorCode.MALFORMED_REQUEST;
     }
 
-    private static HttpStatus statusFor(ErrorCode code) {
+    /** The single ErrorCode → HTTP status contract; reused by application advice so the mapping is never duplicated. */
+    public static HttpStatus statusFor(ErrorCode code) {
         return switch (code) {
             case VALIDATION_ERROR, INVALID_INPUT, MALFORMED_REQUEST -> HttpStatus.BAD_REQUEST;
             case AUTHENTICATION_REQUIRED -> HttpStatus.UNAUTHORIZED;

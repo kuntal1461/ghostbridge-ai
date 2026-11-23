@@ -13,7 +13,7 @@ Caller (GhostBridge App / REST)            ghostbridge-ai-web
         │                          │             Service            + AiMetricsRecorder
         └────────────► AiProvider (SPI) ◄────────┘
                        ├─ MockAiProvider (local/test only)
-                       └─ BedrockAiProvider (Converse API, AWS default credential chain)
+                       └─ OllamaAiProvider (OpenAI-compatible /v1/chat/completions over HTTPS; backend-only OLLAMA_API_KEY held as AiSecret)
 ```
 Dependency rules: `ai-web → ai-core → springboot-core`; `ai-web → springboot-web`; ai-core never references ai-web or app; no executable application.
 
@@ -36,7 +36,7 @@ Authentication from the shared chain; roles `AI_USER`/`AI_ADMIN` (method securit
 No database. Prompts/schemas are classpath resources loaded and validated at startup. Registry is bounded and process-local.
 
 ## Testing strategy
-Mock provider and mocked `BedrockRuntimeClient`; `@WebMvcTest`/`@SpringBootTest` slices with `spring-security-test`; live provider test tagged `live-provider` (disabled by default). Full list: task `test-cases.md`.
+Mock provider and a local stub HTTP server standing in for Ollama Cloud (synthetic credentials only); `@WebMvcTest`/`@SpringBootTest` slices with `spring-security-test`; live provider test tagged `live-provider` (disabled by default). Full list: task `test-cases.md`.
 
 ## Key decisions
 D1–D14 in the task `implementation-plan.md` (Converse API, resource prompts, networknt schema validation, additive ErrorCode change, in-house limiter/retry, optional Micrometer, in-memory registry, role model, structural prompt-injection controls, springdoc deferred, Vite/Vitest/ESLint, tagged live tests).

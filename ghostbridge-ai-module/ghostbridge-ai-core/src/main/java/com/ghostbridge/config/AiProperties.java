@@ -12,6 +12,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
@@ -45,11 +47,13 @@ public record AiProperties(
         @Valid @NotNull @DefaultValue Budget budget,
         @Valid @NotNull @DefaultValue Pricing pricing,
         @Valid @NotNull @DefaultValue Mock mock,
+        @Valid @NotNull @DefaultValue Ollama ollama,
         @DefaultValue List<String> redactionPatterns,
         @DefaultValue("200") @Min(1) @Max(10000) int historyMaxEntries) {
 
     public static final String DEFAULT_MOCK_MODEL = "mock-model";
-    private static final Set<String> PROVIDERS = Set.of(GhostBridgeAiLiterals.PROVIDER_MOCK, GhostBridgeAiLiterals.PROVIDER_BEDROCK);
+    private static final Set<String> PROVIDERS = Set.of(GhostBridgeAiLiterals.PROVIDER_MOCK,
+            GhostBridgeAiLiterals.PROVIDER_BEDROCK, GhostBridgeAiLiterals.PROVIDER_OLLAMA);
 
     public AiProperties {
         provider = normalizeProvider(provider);
@@ -87,6 +91,9 @@ public record AiProperties(
         }
         if (!PROVIDERS.contains(provider)) {
             throw new IllegalArgumentException("ghostbridge.ai.provider must be one of " + PROVIDERS);
+        }
+        if (GhostBridgeAiLiterals.PROVIDER_OLLAMA.equals(provider) && modelId == null) {
+            throw new IllegalArgumentException("ghostbridge.ai.model-id is required when provider=ollama");
         }
         if (GhostBridgeAiLiterals.PROVIDER_BEDROCK.equals(provider)) {
             if (modelId == null) {
@@ -161,5 +168,83 @@ public record AiProperties(
 
     /** Mock provider settings (non-secret). {@code response} overrides the generated deterministic output. */
     public record Mock(String response) {
+    }
+
+    /**
+     * Ollama Cloud settings. The credential ({@code api-key}, normally mapped from the {@code OLLAMA_API_KEY}
+     * environment variable) is an {@link AiSecret}: it is masked in every string, JSON or log representation and is
+     * never part of any committed configuration. The destination is restricted to HTTPS on an allow-listed host with
+     * no user-info, query or fragment, and redirects are never followed by the provider.
+     */
+    public record Ollama(
+            @DefaultValue("cloud") String mode,
+            @DefaultValue("https://ollama.com") String baseUrl,
+            @DefaultValue("ollama.com") List<String> allowedHosts,
+            AiSecret apiKey,
+            @DefaultValue("5s") @NotNull Duration connectTimeout,
+            @DefaultValue("262144") @Min(1024) @Max(8388608) int maxRequestBytes,
+            @DefaultValue("1048576") @Min(1024) @Max(16777216) int maxResponseBytes) {
+
+        public Ollama {
+            mode = mode == null ? null : mode.trim().toLowerCase(Locale.ROOT);
+            if (!GhostBridgeAiLiterals.OLLAMA_MODE_CLOUD.equals(mode)) {
+                throw new IllegalArgumentException("ghostbridge.ai.ollama.mode must be 'cloud'");
+            }
+            allowedHosts = allowedHosts == null ? List.of()
+                    : allowedHosts.stream().map(host -> host.trim().toLowerCase(Locale.ROOT)).toList();
+            apiKey = apiKey == null ? AiSecret.empty() : apiKey;
+            requirePositive(connectTimeout, "ghostbridge.ai.ollama.connect-timeout");
+            if (connectTimeout.compareTo(GhostBridgeAiLiterals.MAX_TIMEOUT) > 0) {
+                throw new IllegalArgumentException("ghostbridge.ai.ollama.connect-timeout must not exceed "
+                        + GhostBridgeAiLiterals.MAX_TIMEOUT);
+            }
+            baseUrl = baseUrl == null ? null : baseUrl.trim();
+            validateDestination(baseUrl, allowedHosts);
+            if (maxRequestBytes < MIN_BODY_BYTES || maxResponseBytes < MIN_BODY_BYTES) {
+                throw new IllegalArgumentException("ghostbridge.ai.ollama byte limits must be at least " + MIN_BODY_BYTES);
+            }
+        }
+
+        /** A copy with the credential replaced (used to apply the environment fallback); all other values are re-validated. */
+        public Ollama withApiKey(AiSecret key) {
+            return new Ollama(mode, baseUrl, allowedHosts, key, connectTimeout, maxRequestBytes, maxResponseBytes);
+        }
+
+        private static final int MIN_BODY_BYTES = 1024;
+
+        /** The validated chat-completions endpoint. Never contains credentials. */
+        public URI chatCompletionsUri() {
+            String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+            try {
+                return new URI(base + GhostBridgeAiLiterals.OLLAMA_CHAT_COMPLETIONS_PATH);
+            } catch (URISyntaxException e) {
+                throw new IllegalStateException("ghostbridge.ai.ollama.base-url is not a valid URI"); // never echo the URL
+            }
+        }
+
+        /** Messages deliberately omit the URL: a mistyped value could contain user-info credentials. */
+        private static void validateDestination(String baseUrl, List<String> allowedHosts) {
+            URI uri = parse(baseUrl);
+            boolean pathOk = uri.getRawPath() == null || uri.getRawPath().isEmpty() || "/".equals(uri.getRawPath());
+            boolean portOk = uri.getPort() == -1 || uri.getPort() == GhostBridgeAiLiterals.HTTPS_DEFAULT_PORT;
+            if (!GhostBridgeAiLiterals.URI_SCHEME_HTTPS.equalsIgnoreCase(uri.getScheme())) {
+                throw new IllegalArgumentException("ghostbridge.ai.ollama.base-url must use https");
+            }
+            if (uri.getHost() == null || !allowedHosts.contains(uri.getHost().toLowerCase(Locale.ROOT))) {
+                throw new IllegalArgumentException("ghostbridge.ai.ollama.base-url host is not in ghostbridge.ai.ollama.allowed-hosts");
+            }
+            if (uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null || !pathOk || !portOk) {
+                throw new IllegalArgumentException(
+                        "ghostbridge.ai.ollama.base-url must be a plain https origin (no user-info, path, query, fragment or custom port)");
+            }
+        }
+
+        private static URI parse(String baseUrl) {
+            try {
+                return new URI(baseUrl == null ? "" : baseUrl.trim());
+            } catch (URISyntaxException e) {
+                throw new IllegalArgumentException("ghostbridge.ai.ollama.base-url is not a valid URI");
+            }
+        }
     }
 }

@@ -13,7 +13,9 @@ public interface AiProvider {
 
     /**
      * Invokes the model. Implementations must honour {@link AiProviderCall#timeout()}, map every failure to an
-     * {@link AiException} with a generic message (provider detail only as the cause), and never log content.
+     * {@link AiException} with a generic message (provider detail only as the cause, except for credential-bearing
+     * adapters such as the Ollama provider, which attach no cause because transport and header errors can quote request
+     * details), and never log content.
      */
     AiProviderResult invoke(AiProviderCall call);
 

@@ -4,7 +4,7 @@
 |---|---|---|---|---|
 | M1 | Discovery and planning | Existing implementation documented; task folder complete (8 mandatory docs + changelog); Kiro spec (requirements/design/tasks) created and cross-referenced; steering and hooks plan recorded; open questions listed; no code written | In progress — documents written, awaiting user review of plan and open questions | Pending user review |
 | M2 | AI Core foundation | See "M2 acceptance criteria" and "M2 remediation criteria" below | **Complete** (2026-11-21), with the caveats listed under "M2 completion record" | `mvn -o clean verify` BUILD SUCCESS (31/55/174); independent review rounds 1-3 |
-| M3 | Real provider integration | `BedrockAiProvider` with credentials from the default chain, timeouts, bounded retry, error mapping; mocked-SDK tests I-04 pass; live test tagged and disabled | Not started | |
+| M3 | Real provider integration — **provider changed from Bedrock to Ollama Cloud by the user; tracked in `../GB-AI-002-ollama-provider-integration/`** | `OllamaAiProvider` with backend-only credential, timeouts, bounded retry, error mapping, G-M3-1 byte limits; stub-server tests; live test tagged and disabled | Not started | |
 | M4 | AI Web | Endpoints, DTOs, advice, authorization; tests I-05…I-13 pass; no competing security/CORS/advice | Not started | |
 | M5 | AI Frontend | Overview, Playground, Viewer, History; `build`, `lint`, `test`, `typecheck` pass; F-01…F-08 pass | Not started | |
 | M6 | Review and hardening | Separate security and quality reviews written; Critical/High resolved or listed as blockers; re-review of fixes; `mvn clean verify` green from root | Not started | |

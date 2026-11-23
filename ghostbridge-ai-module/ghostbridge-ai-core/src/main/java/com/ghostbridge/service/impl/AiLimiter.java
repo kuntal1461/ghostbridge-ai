@@ -6,6 +6,7 @@ import com.ghostbridge.exception.AiErrorReason;
 import com.ghostbridge.exception.AiException;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -35,9 +36,10 @@ public class AiLimiter {
         if (!concurrency.tryAcquire()) {
             throw new AiException(AiErrorReason.RATE_LIMITED, "Too many concurrent AI requests");
         }
-        if (!admitWithinRate()) {
+        long retryAfterMillis = admitOrRetryAfterMillis();
+        if (retryAfterMillis > 0) {
             concurrency.release();
-            throw new AiException(AiErrorReason.RATE_LIMITED, "AI request rate limit exceeded");
+            throw new AiException(AiErrorReason.RATE_LIMITED, "AI request rate limit exceeded", Duration.ofMillis(retryAfterMillis));
         }
         AtomicBoolean released = new AtomicBoolean();
         return () -> {
@@ -47,16 +49,18 @@ public class AiLimiter {
         };
     }
 
-    private synchronized boolean admitWithinRate() {
+    /** Returns 0 when the request was admitted, otherwise the positive milliseconds until the window resets. */
+    private synchronized long admitOrRetryAfterMillis() {
         long now = clock.millis();
-        if (now - windowStartMillis >= GhostBridgeAiLiterals.RATE_LIMIT_WINDOW.toMillis()) {
+        long windowMillis = GhostBridgeAiLiterals.RATE_LIMIT_WINDOW.toMillis();
+        if (now - windowStartMillis >= windowMillis) {
             windowStartMillis = now;
             used = 0;
         }
         if (used >= requestsPerWindow) {
-            return false;
+            return Math.max(1, windowStartMillis + windowMillis - now);
         }
         used++;
-        return true;
+        return 0;
     }
 }

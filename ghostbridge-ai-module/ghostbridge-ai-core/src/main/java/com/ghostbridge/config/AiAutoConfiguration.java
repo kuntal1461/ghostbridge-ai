@@ -17,6 +17,7 @@ import com.ghostbridge.service.impl.DefaultAiCoordinator;
 import com.ghostbridge.service.impl.InMemoryAiRequestRegistry;
 import com.ghostbridge.service.impl.JsonSchemaAiStructuredOutputService;
 import com.ghostbridge.service.impl.MockAiProvider;
+import com.ghostbridge.service.impl.OllamaAiProvider;
 import com.ghostbridge.util.AiTextSanitizer;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.ObjectProvider;
@@ -26,7 +27,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.env.StandardEnvironment;
 
 import java.time.Clock;
 
@@ -38,10 +42,32 @@ import java.time.Clock;
 @EnableConfigurationProperties(AiProperties.class)
 public class AiAutoConfiguration {
 
-    /** Keeps the mock-in-production guard eager even when the application uses lazy initialization. */
+    /**
+     * Keeps the mock-in-production guard and the Ollama provider (credential check) eager even when the application
+     * uses lazy initialization, so unsafe or incomplete configuration fails at startup.
+     */
     @Bean
     static LazyInitializationExcludeFilter aiProductionValidatorEagerFilter() {
-        return LazyInitializationExcludeFilter.forBeanTypes(AiProductionValidator.class);
+        return LazyInitializationExcludeFilter.forBeanTypes(AiProductionValidator.class, OllamaAiProvider.class);
+    }
+
+    /**
+     * The credential comes from {@code ghostbridge.ai.ollama.api-key} or, when that is blank, from the
+     * {@code OLLAMA_API_KEY} environment variable. The failure message names the settings only, never a value.
+     */
+    @Bean
+    @ConditionalOnProperty(prefix = GhostBridgeAiLiterals.PROPERTY_PREFIX, name = GhostBridgeAiLiterals.PROPERTY_PROVIDER, havingValue = GhostBridgeAiLiterals.PROVIDER_OLLAMA)
+    @ConditionalOnMissingBean(OllamaAiProvider.class)
+    OllamaAiProvider ollamaAiProvider(AiProperties properties, ObjectMapper mapper, Environment environment) {
+        AiProperties.Ollama settings = properties.ollama();
+        if (!settings.apiKey().isPresent()) {
+            settings = settings.withApiKey(new AiSecret(operatingSystemEnvironmentValue(environment)));
+        }
+        if (!settings.apiKey().isPresent()) {
+            throw new IllegalStateException("The Ollama API key is not configured: set ghostbridge.ai.ollama.api-key "
+                    + "or the environment variable " + GhostBridgeAiLiterals.ENV_OLLAMA_API_KEY + " (backend runtime only)");
+        }
+        return new OllamaAiProvider(settings, mapper);
     }
 
     @Bean
@@ -55,6 +81,17 @@ public class AiAutoConfiguration {
     @ConditionalOnMissingBean(MockAiProvider.class)
     AiProvider mockAiProvider(AiProperties properties) {
         return new MockAiProvider(properties.mock());
+    }
+
+    /** Reads {@code OLLAMA_API_KEY} from the OS environment source only, not from files, -D properties or arguments. */
+    private static String operatingSystemEnvironmentValue(Environment environment) {
+        if (environment instanceof ConfigurableEnvironment configurable) {
+            PropertySource<?> source = configurable.getPropertySources()
+                    .get(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME);
+            Object value = source == null ? null : source.getProperty(GhostBridgeAiLiterals.ENV_OLLAMA_API_KEY);
+            return value == null ? null : value.toString();
+        }
+        return null;
     }
 
     @Bean
