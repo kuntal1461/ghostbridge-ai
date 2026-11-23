@@ -16,7 +16,7 @@ A provider-neutral, reusable AI subsystem (`ghostbridge-ai-core`, `-web`, `-fron
 1. WHEN `ghostbridge.ai.provider` names a registered adapter THEN the system SHALL route calls to it.
 2. IF the provider is unset or unknown THEN the system SHALL report a missing-configuration error and SHALL NOT fall back to another provider.
 3. IF the provider is `mock` AND (the profile `prod` is active OR none of `local`, `dev`, `test` is active) THEN startup SHALL fail.
-4. Only the `mock` and `bedrock` adapters SHALL exist.
+4. The implemented adapters SHALL be `mock` and `ollama` (Ollama Cloud, GB-AI-002). `bedrock` is accepted by configuration validation only and has no adapter.
 
 ### R3 — Configuration
 1. The system SHALL bind validated properties under `ghostbridge.ai.*`: provider, approved models, default/maximum output tokens, temperature bounds, timeout, retry, rate limit, concurrency, max input length, max response size, optional token budget, optional pricing, structured-output settings.
@@ -68,3 +68,10 @@ Reviews by `ghostbridge-security-reviewer` and `ghostbridge-code-quality-reviewe
 
 ## Acceptance
 See task `requirements.md` → Acceptance criteria 1–11 and `test-cases.md`.
+
+### R15 — Ollama Cloud provider and credential security (GB-AI-002)
+1. WHEN `ghostbridge.ai.provider=ollama` THEN the system SHALL call `POST <base-url>/v1/chat/completions` with the configured model, temperature and `max_tokens`, reusing the coordinator, limits, retry, budget, telemetry and structured validation.
+2. The API key SHALL come only from the backend runtime (`ghostbridge.ai.ollama.api-key` or `OLLAMA_API_KEY`), SHALL be held in a masked secret type, and SHALL NOT appear in source, committed configuration, tests, docs, logs, telemetry, errors, URLs, responses or the frontend.
+3. IF the key is missing THEN startup SHALL fail with a message that names the settings and never a value.
+4. The destination SHALL be HTTPS on an allow-listed host; redirects SHALL NOT be followed; request and response bodies SHALL be bounded in bytes; error-status bodies SHALL NOT be read into messages.
+5. Provider failures SHALL map to typed errors (401/403 credentials, 429 throttled, 5xx unavailable, timeouts, malformed response) with generic messages.

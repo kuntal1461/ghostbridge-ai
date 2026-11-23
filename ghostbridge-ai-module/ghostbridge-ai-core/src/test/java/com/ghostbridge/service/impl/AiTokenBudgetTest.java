@@ -65,4 +65,14 @@ class AiTokenBudgetTest {
         now[0] = Clock.fixed(Instant.parse("2026-01-01T00:06:00Z"), ZoneOffset.UTC);
         assertThatCode(budget::checkAvailable).doesNotThrowAnyException();
     }
+
+    @Test
+    void exhaustedBudgetReportsTheRemainingWindowAsRetryAfter() {
+        AiTokenBudget budget = new AiTokenBudget(new AiProperties.Budget(10, Duration.ofHours(1)), Clock.systemUTC());
+        budget.record(new AiUsage(10, 0, null));
+        assertThatThrownBy(budget::checkAvailable).isInstanceOfSatisfying(AiException.class, e -> {
+            assertThat(e.getRetryAfter()).isPresent();
+            assertThat(e.getRetryAfter().get()).isPositive().isLessThanOrEqualTo(Duration.ofHours(1));
+        });
+    }
 }
