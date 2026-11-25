@@ -1,5 +1,6 @@
 package com.ghostbridge.restcontroller;
 
+import com.ghostbridge.config.ConditionalOnAiRestApi;
 import com.ghostbridge.config.ConditionalOnAiWebSecurity;
 import com.ghostbridge.constants.GhostBridgeAiLiterals;
 import com.ghostbridge.requestvo.AiGenerateRequestVO;
@@ -29,7 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
  * the controller is not registered while the shared security chain is disabled.
  */
 @RestController
+@AiApiEndpoint
 @ConditionalOnAiWebSecurity
+@ConditionalOnAiRestApi
 @RequestMapping(GhostBridgeAiLiterals.API_BASE_PATH)
 public class AiRestController {
     private final AiApiService service;

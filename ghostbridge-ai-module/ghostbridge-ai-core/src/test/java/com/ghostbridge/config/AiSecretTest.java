@@ -54,7 +54,7 @@ class AiSecretTest {
 
     @Test
     void propertiesRecordsNeverPrintTheCredential() {
-        AiProperties props = AiTestSupport.properties("provider", "ollama", "model-id", "m", "ollama.api-key", DUMMY);
+        AiProperties props = AiTestSupport.properties("provider", "ollama", "ollama.local-enabled", "false", "model-id", "m", "ollama.api-key", DUMMY);
         assertThat(props.ollama().apiKey().reveal()).isEqualTo(DUMMY);
         assertThat(props.toString()).doesNotContain(DUMMY).contains("****");
         assertThat(props.ollama().toString()).doesNotContain(DUMMY);

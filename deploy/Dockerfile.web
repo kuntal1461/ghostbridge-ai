@@ -1,0 +1,18 @@
+# The React app (App frontend with the hosted AI console) served by Caddy, which also proxies /api to the application.
+# Build context: the repository root.
+# Caddy is built with the rate-limit module (the stock image has none) so that /api/v1/auth and /api/v1/ai are limited per client at the edge.
+FROM node:22-slim@sha256:be979e5523c76fa4d5ca4ebd3099078f220aa47ec39c48ad5b5df9314debd6eb AS build
+WORKDIR /src
+COPY package.json package-lock.json ./
+COPY ghostbridge-ai-module/ghostbridge-ai-frontend ghostbridge-ai-module/ghostbridge-ai-frontend
+COPY ghostbridge-app/ghostbridge-app-frontend ghostbridge-app/ghostbridge-app-frontend
+RUN npm ci
+RUN npm run build -w ghostbridge-app-frontend
+
+FROM caddy:2.11.9-builder@sha256:cda07fe9d82728c7ac44d844306d435e98131423dc7b114f05a8a8ecfff94707 AS caddy-build
+RUN xcaddy build v2.11.9 --with github.com/mholt/caddy-ratelimit@v0.1.0
+
+FROM caddy:2.11.9@sha256:4851e54a46b206517c574821bb5cc67f170d2156041e9fbc4c9193b45e84a75b
+COPY --from=caddy-build /usr/bin/caddy /usr/bin/caddy
+COPY --from=build /src/ghostbridge-app/ghostbridge-app-frontend/dist /srv
+COPY deploy/Caddyfile /etc/caddy/Caddyfile

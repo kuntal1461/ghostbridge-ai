@@ -14,7 +14,7 @@ class AiOllamaPropertiesTest {
     private static final String DUMMY = "test-dummy-key-0123456789";
 
     private static AiProperties ollama(String... extra) {
-        String[] base = {"provider", "ollama", "model-id", "configured-model"};
+        String[] base = {"provider", "ollama", "ollama.local-enabled", "false", "model-id", "configured-model"};
         String[] all = new String[base.length + extra.length];
         System.arraycopy(base, 0, all, 0, base.length);
         System.arraycopy(extra, 0, all, base.length, extra.length);
@@ -36,8 +36,8 @@ class AiOllamaPropertiesTest {
 
     @Test
     void modelIdIsRequiredAndNeverDefaultedForOllama() {
-        assertThatThrownBy(() -> AiTestSupport.properties("provider", "ollama")).isInstanceOf(BindException.class)
-                .hasRootCauseMessage("ghostbridge.ai.model-id is required when provider=ollama");
+        assertThatThrownBy(() -> AiTestSupport.properties("provider", "ollama", "ollama.local-enabled", "false")).isInstanceOf(BindException.class)
+                .hasRootCauseMessage("ghostbridge.ai.model-id or the selected ghostbridge.ai.ollama.(local|cloud).model is required when provider=ollama");
     }
 
     @Test
@@ -96,9 +96,10 @@ class AiOllamaPropertiesTest {
     }
 
     @Test
-    void onlyCloudModeIsSupported() {
+    void theLegacyModeMustAgreeWithTheExplicitFlagAndABlankModeIsUnset() {
         assertThatThrownBy(() -> ollama("ollama.mode", "local")).isInstanceOf(BindException.class);
-        assertThatThrownBy(() -> ollama("ollama.mode", "")).isInstanceOf(BindException.class);
+        assertThatThrownBy(() -> ollama("ollama.mode", "banana")).isInstanceOf(BindException.class);
+        assertThat(ollama("ollama.mode", "").ollama().mode()).isEqualTo("cloud");
         assertThat(ollama("ollama.mode", "CLOUD").ollama().mode()).isEqualTo("cloud");
     }
 

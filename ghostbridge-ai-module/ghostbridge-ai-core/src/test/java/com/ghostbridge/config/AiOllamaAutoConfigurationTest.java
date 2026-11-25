@@ -40,7 +40,8 @@ class AiOllamaAutoConfigurationTest {
             .withBean(ObjectMapper.class, ObjectMapper::new)
             .withConfiguration(AutoConfigurations.of(AiAutoConfiguration.class))
             .withInitializer(context -> isolatedEnvironment(Map.of(), context))
-            .withPropertyValues("ghostbridge.ai.provider=ollama", "ghostbridge.ai.model-id=configured-model");
+            .withPropertyValues("ghostbridge.ai.provider=ollama", "ghostbridge.ai.ollama.local-enabled=false",
+                    "ghostbridge.ai.model-id=configured-model");
 
     private static String chainOf(Throwable failure) {
         StringBuilder text = new StringBuilder();
@@ -53,7 +54,7 @@ class AiOllamaAutoConfigurationTest {
     private static void assertSafeStartupFailure(AssertableApplicationContext context) {
         assertThat(context).hasFailed();
         String text = chainOf(context.getStartupFailure());
-        assertThat(text).contains("OLLAMA_API_KEY").contains("ghostbridge.ai.ollama.api-key").doesNotContain(DUMMY);
+        assertThat(text).contains("OLLAMA_API_KEY").contains("ghostbridge.ai.ollama.cloud.api-key").doesNotContain(DUMMY);
     }
 
     @Test
@@ -99,7 +100,7 @@ class AiOllamaAutoConfigurationTest {
             runner.withPropertyValues("ghostbridge.ai.ollama.api-key=" + bad).run(context -> {
                 assertThat(context).hasFailed();
                 String text = chainOf(context.getStartupFailure());
-                assertThat(text).contains("ghostbridge.ai.ollama.api-key").doesNotContain("test-dummy").doesNotContain("injected");
+                assertThat(text).contains("ghostbridge.ai.ollama.cloud.api-key").doesNotContain("test-dummy").doesNotContain("injected");
             });
         }
     }
@@ -156,7 +157,7 @@ class AiOllamaAutoConfigurationTest {
     void missingCredentialStillFailsAtStartupUnderLazyInitialization() {
         assertThatThrownBy(() -> new SpringApplicationBuilder(LazyApp.class).web(WebApplicationType.NONE)
                 .initializers(context -> isolatedEnvironment(Map.of(), context))
-                .properties("ghostbridge.ai.provider=ollama", "ghostbridge.ai.model-id=configured-model",
+                .properties("ghostbridge.ai.provider=ollama", "ghostbridge.ai.ollama.local-enabled=false", "ghostbridge.ai.model-id=configured-model",
                         "spring.main.lazy-initialization=true").run().close())
                 .satisfies(e -> assertThat(chainOf(e)).contains("OLLAMA_API_KEY").doesNotContain(DUMMY));
     }
@@ -195,5 +196,100 @@ class AiOllamaAutoConfigurationTest {
             assumeThat(keyEntries).as("the metadata found on the classpath is not the AI core's").isNotEmpty();
             assertThat(root.toString()).doesNotContain(DUMMY);
         }
+    }
+
+    @Test
+    void localModeStartsWithoutAnyCredentialAndUsesTheLocalModel() {
+        runner.withPropertyValues("ghostbridge.ai.model-id=", "ghostbridge.ai.ollama.local-enabled=true",
+                "ghostbridge.ai.ollama.local.base-url=http://127.0.0.1:11434", "ghostbridge.ai.ollama.local.model=qwen2.5-coder:3b")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(AiProperties.class).modelId()).isEqualTo("qwen2.5-coder:3b");
+                    assertThat(context.getBeansOfType(AiProvider.class)).hasSize(1);
+                    assertThat(context.getBean(AiProvider.class).name()).isEqualTo("ollama");
+                });
+    }
+
+    @Test
+    void localModeIgnoresAnOperatingSystemCredential() {
+        new ApplicationContextRunner().withBean(ObjectMapper.class, ObjectMapper::new)
+                .withConfiguration(AutoConfigurations.of(AiAutoConfiguration.class))
+                .withInitializer(context -> isolatedEnvironment(Map.of("OLLAMA_API_KEY", DUMMY), context))
+                .withPropertyValues("ghostbridge.ai.provider=ollama", "ghostbridge.ai.ollama.local-enabled=true",
+                        "ghostbridge.ai.ollama.local.base-url=http://127.0.0.1:11434", "ghostbridge.ai.ollama.local.model=m")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(AiProperties.class).ollama().apiKey().isPresent()).isFalse();
+                });
+    }
+
+    @Test
+    void cloudModeWithoutAKeyFailsEvenWhenLocalSettingsArePresentAndNeverFallsBackToLocal() {
+        runner.withPropertyValues("ghostbridge.ai.ollama.local-enabled=false",
+                "ghostbridge.ai.ollama.local.base-url=http://127.0.0.1:11434", "ghostbridge.ai.ollama.local.model=m")
+                .run(AiOllamaAutoConfigurationTest::assertSafeStartupFailure);
+    }
+
+    @Test
+    void invalidLocalConfigurationFailsStartupWithoutEchoingTheUrl() {
+        runner.withPropertyValues("ghostbridge.ai.ollama.local-enabled=true", "ghostbridge.ai.ollama.local.model=m",
+                "ghostbridge.ai.ollama.local.base-url=http://user:pw-secret@8.8.8.8:11434").run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(chainOf(context.getStartupFailure())).contains("ghostbridge.ai.ollama.local.base-url")
+                            .doesNotContain("pw-secret").doesNotContain("8.8.8.8");
+                });
+    }
+
+    @Test
+    void anUndeterminedModeFailsStartupEvenWithACredentialInTheEnvironment() {
+        new ApplicationContextRunner().withBean(ObjectMapper.class, ObjectMapper::new)
+                .withConfiguration(AutoConfigurations.of(AiAutoConfiguration.class))
+                .withInitializer(context -> isolatedEnvironment(Map.of("OLLAMA_API_KEY", DUMMY), context))
+                .withPropertyValues("ghostbridge.ai.provider=ollama", "ghostbridge.ai.model-id=configured-model")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    String text = chainOf(context.getStartupFailure());
+                    assertThat(text).contains("ghostbridge.ai.ollama.local-enabled must be set explicitly").doesNotContain(DUMMY);
+                });
+    }
+
+    @Test
+    void aMisspelledFlagWithLocalSettingsStartsLocalAndNeverTheCloud() {
+        new ApplicationContextRunner().withBean(ObjectMapper.class, ObjectMapper::new)
+                .withConfiguration(AutoConfigurations.of(AiAutoConfiguration.class))
+                .withInitializer(context -> isolatedEnvironment(Map.of("OLLAMA_API_KEY", DUMMY), context))
+                .withPropertyValues("ghostbridge.ai.provider=ollama", "ghostbridge.ai.ollama.local-enable=true",
+                        "ghostbridge.ai.ollama.local.base-url=http://127.0.0.1:11434", "ghostbridge.ai.ollama.local.model=m")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(AiProperties.class).ollama().mode()).isEqualTo("local");
+                    assertThat(context.getBean(AiProperties.class).ollama().credentialRequired()).isFalse();
+                });
+    }
+
+    @Test
+    void relaxedEnvironmentVariableNamesSelectLocalModeWithoutAnyCredential() {
+        new ApplicationContextRunner().withBean(ObjectMapper.class, ObjectMapper::new)
+                .withConfiguration(AutoConfigurations.of(AiAutoConfiguration.class))
+                .withInitializer(context -> isolatedEnvironment(Map.of("GHOSTBRIDGE_AI_PROVIDER", "ollama",
+                        "GHOSTBRIDGE_AI_OLLAMA_LOCAL_ENABLED", "TRUE", "GHOSTBRIDGE_AI_OLLAMA_LOCAL_BASE_URL", "http://127.0.0.1:11434",
+                        "GHOSTBRIDGE_AI_OLLAMA_LOCAL_MODEL", "phi3:3.8b"), context))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(AiProperties.class).modelId()).isEqualTo("phi3:3.8b");
+                    assertThat(context.getBean(AiProperties.class).ollama().credentialRequired()).isFalse();
+                });
+    }
+
+    @Test
+    void anEnvironmentOnlyCloudSetupWithoutTheFlagFailsStartupInsteadOfCallingThePaidCloud() {
+        new ApplicationContextRunner().withBean(ObjectMapper.class, ObjectMapper::new)
+                .withConfiguration(AutoConfigurations.of(AiAutoConfiguration.class))
+                .withInitializer(context -> isolatedEnvironment(Map.of("GHOSTBRIDGE_AI_PROVIDER", "ollama",
+                        "GHOSTBRIDGE_AI_MODEL_ID", "deepseek-v4.1-flash", "OLLAMA_API_KEY", DUMMY), context))
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(chainOf(context.getStartupFailure())).contains("local-enabled must be set explicitly").doesNotContain(DUMMY);
+                });
     }
 }

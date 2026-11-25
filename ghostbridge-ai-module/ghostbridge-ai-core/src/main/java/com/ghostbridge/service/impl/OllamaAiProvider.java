@@ -15,6 +15,7 @@ import com.ghostbridge.exception.AiException;
 import com.ghostbridge.service.AiProvider;
 
 import java.io.IOException;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -30,7 +31,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 
 /**
- * Ollama Cloud adapter (OpenAI-compatible chat completions). Security properties:
+ * Ollama adapter (OpenAI-compatible chat completions) for Ollama Cloud or a self-hosted Ollama, as selected by
+ * {@code ghostbridge.ai.ollama.local-enabled}. In local mode no credential is required, read or sent. Security properties
+ * of the credentialed (cloud) mode:
  * <ul>
  *   <li>The credential is an {@link AiSecret}, read only to build the {@code Authorization} header of a request to the
  *       validated endpoint; it is never logged, put in a URL, a message, a cause or telemetry. A credential that is not
@@ -53,7 +56,8 @@ import java.util.regex.Pattern;
  * calls it when the context closes).
  */
 public class OllamaAiProvider implements AiProvider, AutoCloseable {
-    private static final String STATUS_DETAIL = "Ollama Cloud (credential configured)";
+    private static final String STATUS_DETAIL_CLOUD = "Ollama Cloud (credential configured)";
+    private static final String STATUS_DETAIL_LOCAL = "Ollama Local (no credential)";
     private static final String MSG_TIMEOUT = "AI provider did not respond in time";
     private static final String MSG_UNEXPECTED_RESPONSE = "AI provider returned an unexpected response";
     private static final Set<String> LOOPBACK_HOSTS = Set.of(GhostBridgeAiLiterals.LOOPBACK_ADDRESS,
@@ -61,15 +65,17 @@ public class OllamaAiProvider implements AiProvider, AutoCloseable {
 
     private final URI endpoint;
     private final AiSecret apiKey;
+    private final boolean sendCredential;
     private final int maxRequestBytes;
     private final int maxResponseBytes;
     private final ObjectMapper mapper;
     private final HttpClient client;
 
-    /** Production constructor: the endpoint comes from validated configuration only (https, allow-listed host). */
+    /** Production constructor: the endpoint comes from validated configuration only (cloud: https and allow-listed host; local: loopback, private or allow-listed host). */
     public OllamaAiProvider(AiProperties.Ollama settings, ObjectMapper mapper) {
-        this(settings.chatCompletionsUri(), settings.apiKey(), settings.connectTimeout(),
-                settings.maxRequestBytes(), settings.maxResponseBytes(), mapper, false);
+        this(settings.chatCompletionsUri(), settings.credentialRequired() ? settings.apiKey() : AiSecret.empty(),
+                settings.credentialRequired(), settings.connectTimeout(), settings.maxRequestBytes(), settings.maxResponseBytes(),
+                mapper, false);
     }
 
     /**
@@ -79,31 +85,41 @@ public class OllamaAiProvider implements AiProvider, AutoCloseable {
      */
     OllamaAiProvider(URI endpoint, AiSecret apiKey, Duration connectTimeout, int maxRequestBytes, int maxResponseBytes,
                      ObjectMapper mapper) {
-        this(endpoint, apiKey, connectTimeout, maxRequestBytes, maxResponseBytes, mapper, true);
+        this(endpoint, apiKey, true, connectTimeout, maxRequestBytes, maxResponseBytes, mapper, true);
     }
 
-    private OllamaAiProvider(URI endpoint, AiSecret apiKey, Duration connectTimeout, int maxRequestBytes,
-                             int maxResponseBytes, ObjectMapper mapper, boolean loopbackOnly) {
-        if (apiKey == null || !apiKey.isPresent()) {
-            throw new IllegalStateException("ghostbridge.ai.ollama.api-key is required for the Ollama provider");
+    private OllamaAiProvider(URI endpoint, AiSecret apiKey, boolean sendCredential, Duration connectTimeout,
+                             int maxRequestBytes, int maxResponseBytes, ObjectMapper mapper, boolean loopbackOnly) {
+        if (sendCredential) {
+            requireUsableCredential(apiKey);
+            requireNoHeaderLogging();
         }
-        if (!apiKey.isHeaderSafe()) {
-            throw new IllegalStateException("ghostbridge.ai.ollama.api-key must be plain printable ASCII without spaces or line breaks");
-        }
-        requireNoHeaderLogging();
         if (loopbackOnly && !LOOPBACK_HOSTS.contains(String.valueOf(endpoint.getHost()).toLowerCase(Locale.ROOT))) {
             throw new IllegalStateException("The test constructor accepts loopback endpoints only");
         }
         this.endpoint = endpoint;
         this.apiKey = apiKey;
+        this.sendCredential = sendCredential;
         this.maxRequestBytes = maxRequestBytes;
         this.maxResponseBytes = maxResponseBytes;
         this.mapper = mapper;
-        this.client = HttpClient.newBuilder()
+        HttpClient.Builder builder = HttpClient.newBuilder()
                 .connectTimeout(connectTimeout)
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .version(HttpClient.Version.HTTP_1_1)
-                .build();
+                .version(HttpClient.Version.HTTP_1_1);
+        if (!sendCredential) {
+            builder.proxy(ProxySelector.of(null)); // local prompts must not be routed through a JVM-wide proxy
+        }
+        this.client = builder.build();
+    }
+
+    private static void requireUsableCredential(AiSecret apiKey) {
+        if (apiKey == null || !apiKey.isPresent()) {
+            throw new IllegalStateException("ghostbridge.ai.ollama.cloud.api-key is required for Ollama Cloud");
+        }
+        if (!apiKey.isHeaderSafe()) {
+            throw new IllegalStateException("ghostbridge.ai.ollama.cloud.api-key must be plain printable ASCII without spaces or line breaks");
+        }
     }
 
     /**
@@ -130,7 +146,7 @@ public class OllamaAiProvider implements AiProvider, AutoCloseable {
 
     @Override
     public AiProviderStatus status() {
-        return new AiProviderStatus(true, STATUS_DETAIL);
+        return new AiProviderStatus(true, sendCredential ? STATUS_DETAIL_CLOUD : STATUS_DETAIL_LOCAL);
     }
 
     @Override
@@ -164,13 +180,15 @@ public class OllamaAiProvider implements AiProvider, AutoCloseable {
     /** A failure here is mapped without its cause: the JDK message of a rejected header quotes the header value. */
     private HttpRequest buildRequest(byte[] body, Duration timeout) {
         try {
-            return HttpRequest.newBuilder(endpoint)
+            HttpRequest.Builder builder = HttpRequest.newBuilder(endpoint)
                     .timeout(timeout)
                     .header(GhostBridgeAiLiterals.HEADER_CONTENT_TYPE, GhostBridgeAiLiterals.CONTENT_TYPE_JSON)
                     .header(GhostBridgeAiLiterals.HEADER_ACCEPT, GhostBridgeAiLiterals.CONTENT_TYPE_JSON)
-                    .header(GhostBridgeAiLiterals.HEADER_AUTHORIZATION, GhostBridgeAiLiterals.BEARER_PREFIX + apiKey.reveal())
-                    .POST(HttpRequest.BodyPublishers.ofByteArray(body))
-                    .build();
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(body));
+            if (sendCredential) {
+                builder.header(GhostBridgeAiLiterals.HEADER_AUTHORIZATION, GhostBridgeAiLiterals.BEARER_PREFIX + apiKey.reveal());
+            }
+            return builder.build();
         } catch (IllegalArgumentException e) {
             throw new AiException(AiErrorReason.PROVIDER_FAILURE, "AI request could not be prepared");
         }

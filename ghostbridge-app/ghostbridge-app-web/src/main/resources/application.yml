@@ -1,0 +1,55 @@
+# GhostBridge App: the single, centralized application configuration. Committed: contains no secret and no user.
+# Secrets (user password hashes) come from the environment or a secret store. Developer-only overrides go in the git-ignored
+# application-local.yml. Every value is read once at startup: restart to change anything.
+spring:
+  application:
+    name: ghostbridge-app
+  profiles:
+    default: dev
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m   # idle timeout (cookie flags HttpOnly/Secure/SameSite=Strict come from the shared defaults)
+
+ghostbridge:
+  security:
+    enabled: true
+    stateless: false                 # cookie session + CSRF (the browser never holds a bearer token)
+    public-paths:                    # only what a signed-out browser must reach to sign in
+      - /api/v1/auth/csrf
+      - /api/v1/auth/login
+      - /api/v1/auth/logout
+  cors:
+    allowed-origins: []              # same origin (reverse proxy or the Vite dev proxy); list explicit origins only if split
+  ai:
+    provider: ollama
+    timeout: 120s                    # local models can be slow on modest hardware
+    max-output-tokens: 512
+    rate-limit:
+      requests-per-minute: 30        # global limit (all callers)
+      max-concurrent: 2
+    ollama:
+      # The mode must be explicit (true = local Ollama, false = Ollama Cloud, paid). This application targets the local one.
+      local-enabled: ${GHOSTBRIDGE_AI_OLLAMA_LOCAL_ENABLED:true}
+      local:
+        base-url: ${GHOSTBRIDGE_AI_OLLAMA_LOCAL_BASE_URL:http://127.0.0.1:11434}
+        model: ${GHOSTBRIDGE_AI_OLLAMA_LOCAL_MODEL}      # required: an installed model; there is deliberately no default
+    web:
+      rest-enabled: false            # AI Web's own controller stays off: AppAiController serves /api/v1/ai/** in this application
+      requester-limit:
+        requests-per-minute: 10      # per signed-in user
+        max-concurrent: 1
+  app:
+    ai:
+      structured-schemas:
+        generic-summary: generic-structured
+    security:
+      login-attempts:
+        max-failures: 5
+        window: 15m
+      # users: supplied by the environment, for example
+      #   GHOSTBRIDGE_APP_SECURITY_USERS_0_USERNAME=demo
+      #   GHOSTBRIDGE_APP_SECURITY_USERS_0_PASSWORD_HASH={bcrypt}$2a$10$...   (hash only, never a plain password)
+      #   GHOSTBRIDGE_APP_SECURITY_USERS_0_ROLES_0=AI_USER

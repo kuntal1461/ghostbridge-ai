@@ -54,7 +54,7 @@ class OllamaCoordinatorIntegrationTest {
     }
 
     private DefaultAiCoordinator coordinator(URI endpoint, int maxRequestBytes, String... extra) {
-        String[] base = {"provider", "ollama", "model-id", "test-model", "retry.initial-backoff", "1ms", "retry.max-backoff", "1ms"};
+        String[] base = {"provider", "ollama", "ollama.local-enabled", "false", "model-id", "test-model", "retry.initial-backoff", "1ms", "retry.max-backoff", "1ms"};
         String[] all = new String[base.length + extra.length];
         System.arraycopy(base, 0, all, 0, base.length);
         System.arraycopy(extra, 0, all, base.length, extra.length);

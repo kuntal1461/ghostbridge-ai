@@ -1,12 +1,13 @@
 package com.ghostbridge.advice;
 
+import com.ghostbridge.util.AiDurations;
 import com.ghostbridge.config.ConditionalOnAiWebSecurity;
 import com.ghostbridge.constants.GhostBridgeAiLiterals;
 import com.ghostbridge.exception.AiErrorReason;
 import com.ghostbridge.exception.AiException;
 import com.ghostbridge.exception.ErrorCode;
 import com.ghostbridge.filter.CorrelationIdFilter;
-import com.ghostbridge.restcontroller.AiRestController;
+import com.ghostbridge.restcontroller.AiApiEndpoint;
 import com.ghostbridge.util.ProblemDetailFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +28,13 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * AI-specific error mapping, scoped to {@link AiRestController} only and ordered ahead of the shared
+ * AI-specific error mapping, scoped to controllers marked {@link AiApiEndpoint} and ordered ahead of the shared
  * {@code GlobalExceptionHandler}, which still handles everything else. It adds the documented {@code reason}
  * property and {@code Retry-After} (only when the failing component knows it), and reports size violations as 413.
  * Status and code come from the shared mapping; no message ever contains provider detail.
  */
 @ConditionalOnAiWebSecurity
-@RestControllerAdvice(assignableTypes = AiRestController.class)
+@RestControllerAdvice(annotations = AiApiEndpoint.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AiExceptionAdvice {
     /** Client-facing text; kept here because client messages do not belong in the literals class. */
@@ -84,6 +85,6 @@ public class AiExceptionAdvice {
 
     /** Whole seconds, rounded up and at least 1, so a client never retries early. */
     private static String seconds(Duration retryAfter) {
-        return Long.toString(Math.max(1, (retryAfter.toMillis() + 999) / 1000));
+        return Long.toString(AiDurations.retryAfterSeconds(retryAfter));
     }
 }

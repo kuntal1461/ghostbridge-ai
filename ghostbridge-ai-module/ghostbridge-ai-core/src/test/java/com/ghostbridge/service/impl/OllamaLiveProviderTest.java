@@ -33,7 +33,7 @@ class OllamaLiveProviderTest {
 
     @Test
     void oneSmallRoundTripAgainstOllamaCloud() {
-        AiProperties properties = AiTestSupport.properties("provider", "ollama", "model-id", System.getenv("GHOSTBRIDGE_AI_MODEL_ID"));
+        AiProperties properties = AiTestSupport.properties("provider", "ollama", "ollama.local-enabled", "false", "model-id", System.getenv("GHOSTBRIDGE_AI_MODEL_ID"));
         AiProperties.Ollama settings = properties.ollama().withApiKey(new AiSecret(System.getenv("OLLAMA_API_KEY")));
         OllamaAiProvider provider = new OllamaAiProvider(settings, new ObjectMapper());
         AiProviderResult result = provider.invoke(new AiProviderCall(properties.modelId(), "Reply with one short word.",

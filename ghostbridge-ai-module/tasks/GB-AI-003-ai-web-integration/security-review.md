@@ -76,3 +76,14 @@ Critical/High unresolved: 0. Result: pass (round 1) with 1 Medium accepted resid
 | SEC-M4-06, 07 | Accepted/documented (core messages are client-safe by contract; `/generate` is limited to registered prompts and approved models). |
 | Info items | Documented in `implementation.md` (status/usage not rate-limited, local fixed window). |
 Missing tests noted by the reviewer (permissive custom `SecurityFilterChain`, real chunked request through a servlet container) remain open.
+
+## Milestone 4 closure verification (2026-11-23, performed by Claude Code during GB-AI-004 Phase 1)
+This is an implementer-side verification, **not** an independent re-review by `ghostbridge-security-reviewer`. Milestone 4 is therefore *closed pending* an independent round-2 review if the team requires one; no such round was run.
+
+| Item | Result |
+|---|---|
+| Missing permissive `SecurityFilterChain` regression test | **Added:** `AiWebPermissiveChainTest` (3 tests). With an application-supplied permit-all chain and CSRF disabled, anonymous callers get 401 `AUTHENTICATION_REQUIRED`, callers without `AI_USER` get 403 `ACCESS_DENIED` on all four endpoints, and an authorized caller gets 200. It passes. The test was not mutation-checked (the resolver was not temporarily removed to watch it fail). |
+| SEC-M4-05 fix | Verified in source (`SIZE_CODES = Set.of("Size", "MaxUtf8Bytes")`) and by `AiRestControllerTest` lines 110-114 (out-of-range `promptVersion` / `maxOutputTokens`). |
+| SEC-M4-01 per-requester token budget | Re-reviewed. Still an accepted residual risk. The per-requester request-count and concurrency limiter plus the optional global `ghostbridge.ai.budget` remain the only controls. **Operational requirement:** production profiles must set `ghostbridge.ai.budget.max-tokens` > 0. A per-requester token budget stays a follow-up task. The frontend (GB-AI-004) adds no new cost path: it issues one request at a time and never retries automatically. |
+| SEC-M4-10 `Retry-After` not CORS-exposed | Not changed (backend contract frozen for GB-AI-004). The frontend is designed for same-origin deployment (reverse proxy or Vite dev proxy). A cross-origin deployment must add `Retry-After` to `ghostbridge.cors.exposed-headers`; the frontend degrades to "retry later" guidance when the header is unreadable. |
+| Full Maven build | `mvn -o clean verify` from the repository root: BUILD SUCCESS, 83 tests in ai-web before the new test; the new test passes (3/3). |

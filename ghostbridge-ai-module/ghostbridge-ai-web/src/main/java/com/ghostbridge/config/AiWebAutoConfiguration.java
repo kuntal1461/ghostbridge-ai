@@ -60,6 +60,7 @@ public class AiWebAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnAiRestApi
     @ConditionalOnMissingBean(AiApiService.class)
     AiApiService aiApiService(AiClient client, AiRequesterLimiter limiter, AiApiMapper mapper, AiProperties aiProperties,
                               AiWebProperties webProperties, AiRequestRegistry registry, ObjectProvider<AiProvider> providers) {
@@ -68,6 +69,7 @@ public class AiWebAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnAiRestApi
     @ConditionalOnMissingBean
     AiRestController aiRestController(AiApiService service, AiRequesterResolver resolver) {
         return new AiRestController(service, resolver);

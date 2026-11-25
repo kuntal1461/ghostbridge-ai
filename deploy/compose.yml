@@ -1,0 +1,84 @@
+# GhostBridge on one VPS: proxy (public) -> app (internal) -> ollama (internal, no published port).
+# Only the proxy publishes ports. Ollama and the application are reachable only on the internal network.
+# Built and run with Docker Desktop on 2026-11-24; see the Milestone 6 test-cases.md. Three networks: edge (proxy, internet), web (proxy <-> app,
+# no internet), models (app <-> ollama, no internet), so the proxy cannot reach the model server.
+services:
+  proxy:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    ports:
+      - "0.0.0.0:80:80"     # IPv4 only on purpose: behind the docker port proxy IPv6 clients can share one source address
+      - "0.0.0.0:443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in deploy/.env (not committed)}
+    depends_on:
+      app:
+        condition: service_healthy
+    networks: [edge, web]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.app
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      GHOSTBRIDGE_AI_OLLAMA_LOCAL_ENABLED: "true"
+      GHOSTBRIDGE_AI_OLLAMA_LOCAL_BASE_URL: http://ollama:11434
+      GHOSTBRIDGE_AI_OLLAMA_LOCAL_MODEL: ${OLLAMA_MODEL:?set OLLAMA_MODEL in deploy/.env}
+      GHOSTBRIDGE_APP_SECURITY_USERS_0_USERNAME: ${DEMO_USERNAME:?set DEMO_USERNAME}
+      GHOSTBRIDGE_APP_SECURITY_USERS_0_PASSWORD_HASH: ${DEMO_PASSWORD_HASH:?set DEMO_PASSWORD_HASH (a {bcrypt} hash)}
+      GHOSTBRIDGE_APP_SECURITY_USERS_0_ROLES_0: AI_USER
+    expose: ["8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n\" >&3 && grep -q \\\"status\\\":\\\"UP\\\" <&3'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [web, models]
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    pids_limit: 512
+
+  ollama:
+    image: ollama/ollama@sha256:4793b080b3a70fbcca3a79672bd208ff7b3c51692a9ba9b3a319bf1e3915c0a9   # pinned; update deliberately
+    # No "ports:" on purpose: 11434 must never be published.
+    environment:
+      OLLAMA_HOST: 0.0.0.0:11434   # reachable only on the models network below
+      OLLAMA_KEEP_ALIVE: 30m
+      OLLAMA_NO_CLOUD: "1"         # never use Ollama cloud features (the network has no route to them anyway)
+    volumes:
+      - ollama_models:/root/.ollama
+    networks: [models]
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: ${OLLAMA_MEM_LIMIT:-6g}
+    pids_limit: 1024
+
+networks:
+  edge: {}
+  web:
+    internal: true   # proxy <-> app only; no route to the internet
+  models:
+    internal: true   # app <-> ollama only; the model server cannot call out and nothing outside can call in
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  ollama_models: {}

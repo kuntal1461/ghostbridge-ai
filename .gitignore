@@ -17,3 +17,9 @@ secrets/
 *.p12
 *.jks
 *.pfx
+
+# Frontend build output
+dist/
+**/demo-pw*
+**/*.pw
+coverage/

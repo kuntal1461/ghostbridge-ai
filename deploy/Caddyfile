@@ -1,0 +1,63 @@
+# Single public origin: static SPA plus /api to the application. TLS certificates are obtained automatically for {$SITE_ADDRESS}.
+# Use SITE_ADDRESS=localhost for a local test (Caddy then serves a local certificate).
+# This Caddy is the only thing that faces the internet, so client addresses seen here are real: the rate limits key on them and
+# Caddy hands the application one X-Forwarded-For value that it builds itself (a client-sent header is not trusted).
+{
+	order rate_limit before basicauth
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# Generous edge cap on request bodies (the application enforces its own, smaller limit, 64 KB by default).
+	request_body {
+		max_size 256KB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Default for the SPA; the API sets its own stricter policy and "?" keeps whatever the application already sent.
+		?Content-Security-Policy "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		-Server
+	}
+
+	# Edge rate limits per client address (in addition to the application's own per-user and login limits).
+	rate_limit {
+		zone auth {
+			match {
+				path /api/v1/auth/*
+			}
+			key {http.request.remote.host}
+			events 30
+			window 1m
+		}
+		zone ai {
+			match {
+				path /api/v1/ai/*
+			}
+			key {http.request.remote.host}
+			events 60
+			window 1m
+		}
+	}
+
+	handle /api/* {
+		reverse_proxy app:8080
+	}
+	handle /actuator/health* {
+		reverse_proxy app:8080
+	}
+	# Everything else operational stays unreachable from outside.
+	handle /actuator/* {
+		respond 404
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
