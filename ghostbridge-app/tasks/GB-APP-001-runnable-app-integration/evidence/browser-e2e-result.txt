@@ -1,0 +1,39 @@
+PASS protected route redirects anonymous browser to /login  [https://localhost/login]
+PASS sign-in page renders
+PASS wrong password shows an error and stays on /login  [Sign-in failed. Check your user name and password.]
+PASS password field cleared after failure
+PASS login works and returns to the requested page (/usage)  [https://localhost/usage]
+PASS session cookie is HttpOnly (not readable by page script)
+PASS session cookie flags Secure/HttpOnly/SameSite=Strict  [{"secure":true,"httpOnly":true,"sameSite":"Strict"}]
+PASS nothing stored in localStorage/sessionStorage
+PASS usage page renders
+PASS dashboard renders
+PASS provider status shows ollama, phi3:3.8b and an available state
+PASS AI playground renders
+PASS server validation error is shown with a reference id (no stack, no internals)
+PASS structured request returns JSON from the local model
+PASS token usage (input/output/total) is displayed for the request  [in=237 out=26 total=263]
+PASS usage page shows request counts and token totals for the caller  [requests=3 ok=2 failed=1 totalTokens=528]
+PASS state-changing call without CSRF token is refused (403)  [403]
+PASS forged CSRF token is refused (403)  [403]
+PASS losing the session sends the user back to sign-in  [https://localhost/login]
+PASS can sign in again
+PASS logout returns to the sign-in page  [https://localhost/login]
+PASS protected route not accessible after logout
+PASS API refuses the logged-out browser (401)  [401]
+PASS browser only talked to https://localhost  [https://localhost]
+API calls seen by the browser:
+  GET /api/v1/auth/csrf 200
+  GET /api/v1/auth/me 401
+  POST /api/v1/auth/login 401
+  POST /api/v1/auth/login 200
+  GET /api/v1/ai/usage 200
+  GET /api/v1/auth/me 200
+  GET /api/v1/ai/provider/status 200
+  POST /api/v1/ai/generate/structured 400
+  POST /api/v1/ai/generate/structured 200
+  POST /api/v1/ai/generate 403
+  GET /api/v1/ai/provider/status 401
+  POST /api/v1/auth/logout 204
+  GET /api/v1/ai/usage 401
+0 failed of 24

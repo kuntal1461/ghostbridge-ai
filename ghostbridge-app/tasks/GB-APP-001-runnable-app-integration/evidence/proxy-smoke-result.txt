@@ -1,0 +1,44 @@
+1 SPA:
+  / -> 200 text/html; charset=utf-8
+  /playground (deep link) -> 200 text/html; charset=utf-8
+2 headers on SPA:
+content-security-policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'
+permissions-policy: camera=(), microphone=(), geolocation=()
+referrer-policy: no-referrer
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+3 anonymous API:
+  /api/v1/ai/usage -> 401
+  /api/v1/auth/me -> 401
+4 actuator:
+  health -> 200
+  env -> 404
+  metrics -> 404
+5 csrf + cookie flags + API headers:
+HTTP/2 200 
+cache-control: no-store
+content-security-policy: default-src 'none'; frame-ancestors 'none'
+set-cookie: JSESSIONID=<redacted>; Path=/; Secure; HttpOnly; SameSite=Strict
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+6 login without CSRF:
+  -> 403
+7 login ok:
+  -> 200
+  user= demo roles= ['AI_USER'] keys= ['roles', 'username']
+8 signed-in:
+  me -> 200
+{"configured":true,"status":"AVAILABLE","provider":"ollama","model":"phi3:3.8b","capabilities":["TEXT_GENERATION","STRUCTURED_OUTPUT"]}  status -> 200
+9 AI POST without CSRF:
+  -> 403
+10 real local inference through proxy (structured):
+{"requestId":"06394090-d35d-448c-afd1-6045ba57d836","schemaName":"generic-summary","model":"phi3:3.8b","structured":{"summary":"GhostBridge is a self-hosted AI app that processes all inferences using a local model."},"usage":{"inputTokens":232,"outputTokens":33,"totalTokens":265},"durationMs":35182}
+  -> 200 in 35.262182s
+11 usage:
+{"scope":"RETAINED_HISTORY","historyLimit":200,"requestCount":1,"successCount":1,"failureCount":0,"requestsWithTokenUsage":1,"inputTokens":232,"outputTokens":33,"totalTokens":265,"rateLimit":{"limitPerMinute":10,"remaining":9,"resetInSeconds":25,"maxConcurrent":1}}
+12 logout then protected:
+  logout -> 204
+  me after logout -> 401
+  usage after logout -> 401

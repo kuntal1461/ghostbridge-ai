@@ -13,6 +13,7 @@ public final class GhostBridgeAiLiterals {
 
     // ---- Configuration namespace and provider identifiers (names only, no settings)
     public static final String PROPERTY_PREFIX = "ghostbridge.ai";
+    public static final String PROPERTY_REST_ENABLED = "rest-enabled";
     public static final String PROPERTY_PROVIDER = "provider";
     public static final String PROVIDER_MOCK = "mock";
     public static final String PROVIDER_BEDROCK = "bedrock";
@@ -22,9 +23,18 @@ public final class GhostBridgeAiLiterals {
     public static final String PROFILE_DEV = "dev";
     public static final String PROFILE_TEST = "test";
 
-    // ---- Ollama Cloud protocol constants (fixed protocol facts only; no credentials, hosts or models)
-    /** The only supported Ollama mode: the hosted API, reached over HTTPS. */
+    // ---- Ollama protocol constants (fixed protocol facts, the hosted-service domain and the model-id pattern; no credentials or deployment values)
+    /** Hosted Ollama API, reached over HTTPS with a credential (the default mode). */
     public static final String OLLAMA_MODE_CLOUD = "cloud";
+    /** Self-hosted Ollama reached over a loopback or private network. No credential is used. */
+    public static final String MESSAGE_SCHEMA_NOT_APPROVED = "Schema is not approved";
+    public static final String MESSAGE_STRUCTURED_MISSING = "Model output was not valid structured output";
+    public static final String OLLAMA_MODE_LOCAL = "local";
+    /** Hosts under this domain are the hosted service and are never valid for local mode. */
+    public static final String OLLAMA_CLOUD_DOMAIN = "ollama.com";
+    public static final String URI_SCHEME_HTTP = "http";
+    /** Safe model identifier: letters, digits and . _ : / @ - only (for example qwen2.5-coder:3b). */
+    public static final String REGEX_MODEL_ID = "[A-Za-z0-9][A-Za-z0-9._:/@-]{0,127}";
     /** Environment variable the backend reads the credential from when the property is blank. */
     public static final String ENV_OLLAMA_API_KEY = "OLLAMA_API_KEY";
     public static final String OLLAMA_CHAT_COMPLETIONS_PATH = "/v1/chat/completions";

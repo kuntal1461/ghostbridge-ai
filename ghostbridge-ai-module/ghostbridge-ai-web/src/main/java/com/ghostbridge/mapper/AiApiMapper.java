@@ -1,6 +1,14 @@
 package com.ghostbridge.mapper;
 
+import com.ghostbridge.constants.GhostBridgeAiLiterals;
 import com.ghostbridge.dto.AiGenerationOptions;
+import com.ghostbridge.dto.AiProviderOverview;
+import com.ghostbridge.dto.AiUsageSummary;
+import com.ghostbridge.util.AiDurations;
+import com.ghostbridge.security.AiRequesterLimiter;
+import com.ghostbridge.responsevo.AiProviderStatusResponseVO;
+import com.ghostbridge.responsevo.AiRateLimitResponseVO;
+import com.ghostbridge.responsevo.AiUsageResponseVO;
 import com.ghostbridge.dto.AiRequest;
 import com.ghostbridge.dto.AiResponse;
 import com.ghostbridge.dto.AiUsage;
@@ -41,7 +49,20 @@ public class AiApiMapper {
                 usage.estimatedCost());
     }
 
-    private static AiGenerationOptions toOptions(AiGenerationOptionsRequestVO options) {
+    public AiProviderStatusResponseVO toProviderStatus(AiProviderOverview overview) {
+        return new AiProviderStatusResponseVO(overview.configured(), overview.state(), overview.provider(), overview.model(),
+                overview.capabilities());
+    }
+
+    public AiUsageResponseVO toUsageResponse(AiUsageSummary totals, int historyLimit, AiRequesterLimiter.Status status) {
+        AiRateLimitResponseVO rateLimit = new AiRateLimitResponseVO(status.limit(), status.remaining(),
+                AiDurations.ceilSeconds(status.resetIn()), status.maxConcurrent());
+        return new AiUsageResponseVO(GhostBridgeAiLiterals.USAGE_SCOPE_RETAINED_HISTORY, historyLimit, totals.requests(),
+                totals.successes(), totals.failures(), totals.requestsWithTokenUsage(), totals.inputTokens(), totals.outputTokens(),
+                totals.totalTokens(), rateLimit);
+    }
+
+    public AiGenerationOptions toOptions(AiGenerationOptionsRequestVO options) {
         return options == null ? AiGenerationOptions.defaults()
                 : new AiGenerationOptions(options.maxOutputTokens(), options.temperature());
     }

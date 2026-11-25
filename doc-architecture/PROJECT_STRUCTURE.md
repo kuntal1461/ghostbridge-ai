@@ -15,6 +15,8 @@ ghostbridge-ai/                      <- repository root
 │   ├── architecture.md              <- HLD
 │   └── PROJECT_STRUCTURE.md         <- this file
 │
+├── package.json                     <- npm workspace root for the two React projects (hoists React once)
+├── deploy/                          <- single-VPS deployment artifacts (Dockerfiles, compose, Caddyfile, runbook)
 ├── ghostbridge-springboot/          <- (1) common backend infrastructure (parent POM)
 │   ├── ghostbridge-springboot-core/     config, exception, util today; entity, repository,
 │   │                                    service (+ impl), dto added when needed
@@ -34,9 +36,10 @@ ghostbridge-ai/                      <- repository root
 └── ghostbridge-app/                 <- (3) integrator + SOAP-to-REST workflow (parent POM)
     ├── ghostbridge-app-core/            entity, repository, service (+ service/impl), dto, util,
     │                                    exception; main business logic
-    ├── ghostbridge-app-web/             runnable Spring Boot app (main class
-    │                                    to be added), controller; depends on app core, springboot-web, ai-web
-    └── ghostbridge-app-frontend/        React/TypeScript (not a Maven module)
+    ├── ghostbridge-app-web/             runnable Spring Boot app (GhostBridgeApplication),
+    │                                    AppAiController, authentication; depends on app core, springboot-web, ai-web
+    ├── ghostbridge-app-frontend/        React/TypeScript (not a Maven module)
+    └── tasks/                           task folders (e.g. GB-APP-001-runnable-app-integration)
 ```
 
 A `frontend` module (React + TypeScript) is not created yet. It is added only when needed.
@@ -79,8 +82,8 @@ ghostbridge-app-core  <-  ghostbridge-app-web (also uses ghostbridge-springboot-
 | `ghostbridge-springboot-web` | `advice`, `config`, `filter`, `security`, `util` (add `controller`, `restcontroller`, `dto` only when needed) |
 | `ghostbridge-ai-core` | `config`, `constants`, `dto`, `service`, `service.impl`, `exception`, `util`; resources `prompts/`, `ai-schemas/` |
 | `ghostbridge-ai-web` | `restcontroller`, `requestvo`, `responsevo`, `mapper`, `service`, `service.impl`, `security`, `filter`, `advice`, `validation`, `config`; resource `META-INF/spring/...AutoConfiguration.imports` (HTTP contracts are `*RequestVO` / `*ResponseVO` records, never `*DTO`) |
-| `ghostbridge-app-core` | `entity`, `repository`, `service`, `service.impl`, `dto`, `util`, `exception` |
-| `ghostbridge-app-web` | `controller`, `restcontroller` |
+| `ghostbridge-app-core` | `config`, `constants`, `entity`, `repository`, `service`, `service.impl`, `dto`, `util`, `exception` |
+| `ghostbridge-app-web` | `config`, `controller`, `restcontroller`, `security`, `mapper`, `responsevo`, `service.impl` (only `RequesterLimitedAppAiService`, which needs ai-web's per-requester limiter that app-core may not depend on) |
 
 Modules share package names, so class names must be unique repository-wide. See [rules.md](../rules/rules.md).
 
@@ -106,7 +109,7 @@ Modules share package names, so class names must be unique repository-wide. See 
 - **GhostBridge AI Module** is an isolated AI subsystem, with its own core, web and frontend.
 - **GhostBridge App** integrates these modules and implements the actual SOAP-to-REST workflow.
 
-> Status: `ghostbridge-springboot` contains the centralized infrastructure (GB-SPRINGBOOT-001). `ghostbridge-ai-core` holds the provider-neutral AI foundation and the Ollama Cloud provider (GB-AI-001 M2, GB-AI-002 M3; stub-tested, not live-verified; Bedrock has no adapter). `ghostbridge-ai-web`, the app modules and all frontends remain structure only; `ghostbridge-app-web` has no main class yet.
+> Status: `ghostbridge-springboot` contains the centralized infrastructure (GB-SPRINGBOOT-001). `ghostbridge-ai-core` holds the provider-neutral AI foundation and the Ollama Cloud provider (GB-AI-001 M2, GB-AI-002 M3; stub-tested, not live-verified; Bedrock has no adapter). `ghostbridge-ai-web` exposes the secured AI REST API (GB-AI-003; its controller is switched off in the App, where `AppAiController` serves the same paths). `ghostbridge-ai-frontend` is a React/TypeScript/Vite console (GB-AI-004; tested against stubbed APIs and a development-only mock, not against a live authenticated backend). `ghostbridge-app` is the runnable platform (GB-APP-001): `ghostbridge-app-web` is the single executable (sign-in with session cookie and CSRF, `AppAiController` serving `/api/v1/ai/**`), `ghostbridge-app-core` holds `AppAiService`, and `ghostbridge-app-frontend` hosts the AI console behind sign-in; verified with automated tests and one manual end-to-end request to a local model, deployment files in `deploy/` were built and run locally with Docker Desktop and a real browser (public-host items unverified). `ghostbridge-springboot-frontend` remains structure only.
 
 ## Rules
 

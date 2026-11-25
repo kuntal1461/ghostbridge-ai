@@ -32,3 +32,6 @@ Provider implemented; credential handling backend-only; G-M3-1 satisfied; provid
 5. The previously shared Ollama key must be revoked by its owner; it never appeared in this repository or its history.
 6. Remaining Low/Info items are listed in the review reports (JDK debug-switch limits, retry double-billing, proxy behavior, Actuator exposure in consuming apps, minor test/Javadoc items).
 7. **M4 is not started:** G-M4-1 (per-requester limits from trusted identity) and G-M4-2 remain mandatory before any AI Web endpoint.
+
+## Live verification status (2026-11-23)
+Not verified. One live request through `OllamaLiveProviderTest` failed with a non-2xx, non-auth status (see test-cases.md). Diagnostic request returned HTTP 402 (billing: usage credits or subscription required). No code defect found; account billing must be fixed before re-running the live test once.

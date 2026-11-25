@@ -1,0 +1,10 @@
+# Development on a developer machine over plain http (Vite dev server proxies /api to this application).
+server:
+  address: 127.0.0.1   # a developer machine must not expose the dev server on the network
+  servlet:
+    session:
+      cookie:
+        secure: false      # a Secure cookie is not stored by every browser over http://localhost
+ghostbridge:
+  security:
+    hsts-enabled: false

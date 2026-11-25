@@ -79,3 +79,33 @@ Added after review: header-unsafe credentials refused (newline, space, tab, zero
 Coverage (ad-hoc JaCoCo run by the quality reviewer, before the last small fixes, not enforced by the build): ai-core 98.4% lines, new/changed classes 98.1%. Sonar: **not verified**. Dependency vulnerability scan: **not performed**.
 
 Still **Not run**: L-01 live round trip (manual only; no request to Ollama has ever been made); real Gitleaks scan (not installed).
+
+## Live verification attempt — 2026-11-23 (run by Claude Code; not Kiro)
+| Item | Result |
+|---|---|
+| Credential handling | Replacement key supplied by the user into an owner-only file outside the repository (mode 600), loaded only inside the Maven process, file deleted afterwards (deletion verified). The key was never printed; 0 occurrences in the test output. A key shared earlier in chat was treated as compromised and not used. |
+| Command | `OllamaLiveProviderTest` in `ghostbridge-ai-core` with `-Dlive.provider=true`, `GHOSTBRIDGE_AI_MODEL_ID=deepseek-v4.1-flash`, run **once**, no retries, no wire logging. |
+| Model availability | `deepseek-v4.1-flash` is listed by the public `https://ollama.com/v1/models` (HTTP 200, unauthenticated, no inference). |
+| Outcome | **FAILED.** `AiException: AI provider could not process the request` (reason `PROVIDER_FAILURE`). In `OllamaAiProvider.requireSuccess` this message is the fallback for a status that is not 2xx, 401/403, 408, 429 or 5xx, i.e. most likely a 400, 402 or 404. The exact status and body are deliberately not exposed by the provider, so the HTTP status is **unknown**. |
+| Inference / token usage | None obtained. Real inference is **not verified**. |
+| Not yet determined | Whether the cause is the request body (the provider sends `temperature`, `max_tokens`, `stream=false`), the model access or billing of the account, or the endpoint path. |
+| Regression run | `mvn -o -B clean verify`: BUILD SUCCESS; ai-core 274 tests, 1 skipped (the live test), ai-web 86, 0 failures. |
+| Secret scans | No key-shaped string (`hex32.token`) in tracked or untracked files, `git diff`, or build output; no tracked `.env`/key files. Gitleaks is not installed (not run). Matches of `OLLAMA_API_KEY=` in existing review docs and one masker test are redacted/synthetic text. |
+
+### Diagnostic preparation (2026-11-23, Claude Code; no live request made)
+- Ollama's OpenAI-compatibility documentation (docs.ollama.com) lists direct cloud access at `https://ollama.com/v1` with the key sent as the API key (Bearer), and `/v1/chat/completions` support for `model`, `messages`, `temperature`, `max_tokens`, `stream`, `response_format`: every field `OllamaChatRequestVO` sends is documented. The examples use model ids with tags (for example `gemma4:31b`); `deepseek-v4.1-flash` appears in the public `/v1/models` list.
+- The diagnostic request has **not** been made: the replacement credential file was not present. HTTP status, error category and root cause remain undetermined.
+
+### Live diagnostic result — 2026-11-23 (Claude Code; exactly one request, no retries, no redirects)
+| Item | Result |
+|---|---|
+| Request | `POST https://ollama.com/v1/chat/completions`, model `deepseek-v4.1-flash`, one user message, no extra parameters. Credential passed through a curl config on stdin (not argv); response held in memory only. |
+| **HTTP status** | **402** |
+| Sanitized provider error | `type: api_error`, message: "Add usage credits or subscribe ..." (link to ollama.com/plans; reference id redacted). |
+| Classification | Billing / payment restriction. The request reached Ollama Cloud and was authenticated far enough to be rejected on account billing. |
+| Root cause | **Account configuration**: no usage credits or subscription on the Ollama account behind the key. Not model availability (model is listed), not endpoint (the right endpoint answered), not the request format (a minimal standard body produced a billing error, not 400/404). |
+| Code defect? | **None confirmed.** The first live failure (provider fallback message) is explained: `OllamaAiProvider.requireSuccess` maps 402 to the generic `PROVIDER_FAILURE`. |
+| Source change needed? | Not to make the test pass. Optional improvement: map 402 to a distinct, client-safe reason (for example provider-unavailable with a billing hint in logs only) so operators can tell billing from a generic failure. Not implemented; would need its own task/regression test. |
+| Input note | The first replacement credential file contained the key pasted four times (malformed). It was de-duplicated locally (identical copies verified) before use; nothing was printed. |
+| Cleanup | Credential file deleted and verified absent; no key-shaped string in repository files or the git diff. |
+| Still required | Add credits/subscription to the Ollama account, then re-run `OllamaLiveProviderTest` once (needs user approval) to confirm inference, response mapping and token usage. Real inference remains **unverified**. |

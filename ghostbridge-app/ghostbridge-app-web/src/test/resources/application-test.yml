@@ -1,0 +1,7 @@
+# Test profile: synthetic values only. The real application.yml still applies underneath.
+ghostbridge:
+  ai:
+    provider: mock
+    ollama:
+      local:
+        model: test-local-model

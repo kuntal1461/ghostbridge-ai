@@ -1,0 +1,35 @@
+A lockout cannot be evaded with forged X-Forwarded-For (7 failed logins, a different forged address each):
+  attempt 1 -> 401
+  attempt 2 -> 401
+  attempt 3 -> 401
+  attempt 4 -> 401
+  attempt 5 -> 401
+  attempt 6 -> 429
+  attempt 7 -> 429
+B the same user name from the (single) real address with the right header set stays locked:
+  -> 429
+C edge rate limit on /api/v1/auth/* (40 quick requests, forged XFF each):
+  21 401
+  19 429
+  429 headers:
+HTTP/2 429 
+retry-after: 59
+D what the Docker host publishes (compose project in ../../../../deploy):
+app: ports=[]
+ollama: ports=[]
+proxy: ports=[0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp]
+  ollama 11434 mapping: [no port 11434/tcp for container deploy-ollama-1: ]
+  app 8080 mapping: [no port 8080/tcp for container deploy-app-1: ]
+  (a host process listening on 127.0.0.1:8080 would be unrelated to this stack; it publishes no 8080)
+E http -> https redirect:
+  http://localhost/ -> 308 https://localhost/
+F path-normalisation probes through the edge (none may expose anything operational or skip a control):
+  /Actuator/env                      -> 404
+  /actuator/health/../env            -> 404
+  //actuator/env                     -> 404
+  /api//v1/ai/usage                  -> 401
+  /API/V1/AI/usage                   -> 401
+  /api/v1/auth;x=1/me                -> 401
+  /actuator/health/../metrics        -> 404
+G request body over the edge cap (300 KB) is refused:
+  -> 413

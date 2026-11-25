@@ -18,11 +18,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Validated AI configuration bound from {@code ghostbridge.ai.*}. No region, model or credential has a default:
  * an unset provider means AI is disabled (there is no silent fallback to the mock provider).
- * Credentials are never properties; providers read them from their own secure source.
+ * Credentials are masked {@link AiSecret}s (or read by the provider from its own secure source), never plain strings.
  *
  * <p>Semantics worth knowing: {@code timeout} applies <em>per provider attempt</em>, so one request can hold a
  * concurrency slot for up to {@code retry.max-attempts × timeout} plus backoff. {@code redaction-patterns} are
@@ -52,6 +53,7 @@ public record AiProperties(
         @DefaultValue("200") @Min(1) @Max(10000) int historyMaxEntries) {
 
     public static final String DEFAULT_MOCK_MODEL = "mock-model";
+    private static final Pattern MODEL_ID = Pattern.compile(GhostBridgeAiLiterals.REGEX_MODEL_ID);
     private static final Set<String> PROVIDERS = Set.of(GhostBridgeAiLiterals.PROVIDER_MOCK,
             GhostBridgeAiLiterals.PROVIDER_BEDROCK, GhostBridgeAiLiterals.PROVIDER_OLLAMA);
 
@@ -60,10 +62,9 @@ public record AiProperties(
         modelId = normalize(modelId);
         approvedModelIds = approvedModelIds == null ? List.of() : List.copyOf(approvedModelIds);
         redactionPatterns = redactionPatterns == null ? List.of() : List.copyOf(redactionPatterns);
-        requirePositive(timeout, "ghostbridge.ai.timeout");
-        if (timeout.compareTo(GhostBridgeAiLiterals.MAX_TIMEOUT) > 0) {
-            throw new IllegalArgumentException("ghostbridge.ai.timeout must not exceed " + GhostBridgeAiLiterals.MAX_TIMEOUT);
-        }
+        requireTimeout(timeout, GhostBridgeAiLiterals.PROPERTY_PREFIX + ".timeout");
+        requireOllamaSelection(provider, ollama);
+        modelId = resolveModelId(provider, modelId, ollama);
         validateProvider(provider, modelId, aws);
         if (GhostBridgeAiLiterals.PROVIDER_MOCK.equals(provider) && modelId == null) {
             modelId = DEFAULT_MOCK_MODEL;
@@ -79,10 +80,37 @@ public record AiProperties(
         return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
     }
 
+    private static void requireTimeout(Duration value, String name) {
+        requirePositive(value, name);
+        if (value.compareTo(GhostBridgeAiLiterals.MAX_TIMEOUT) > 0) {
+            throw new IllegalArgumentException(name + " must not exceed " + GhostBridgeAiLiterals.MAX_TIMEOUT);
+        }
+    }
+
     private static void requirePositive(Duration value, String name) {
         if (value == null || value.isZero() || value.isNegative()) {
             throw new IllegalArgumentException(name + " must be a positive duration");
         }
+    }
+
+    /** The Ollama mode is never guessed: an undetermined mode fails startup instead of defaulting to the paid cloud. */
+    private static void requireOllamaSelection(String provider, Ollama ollama) {
+        if (GhostBridgeAiLiterals.PROVIDER_OLLAMA.equals(provider) && ollama != null && !ollama.isSelected()) {
+            throw new IllegalArgumentException(Ollama.PREFIX
+                    + "local-enabled must be set explicitly: true for a local Ollama, false for Ollama Cloud (paid)");
+        }
+    }
+
+    /** For the Ollama provider the selected mode's model wins; a different legacy {@code model-id} is a conflict. */
+    private static String resolveModelId(String provider, String modelId, Ollama ollama) {
+        if (!GhostBridgeAiLiterals.PROVIDER_OLLAMA.equals(provider) || ollama == null) {
+            return modelId;
+        }
+        String selected = ollama.selectedModel();
+        if (selected != null && modelId != null && !modelId.equals(selected)) {
+            throw new IllegalArgumentException("ghostbridge.ai.model-id conflicts with " + ollama.selectedModelProperty());
+        }
+        return validModel(selected != null ? selected : modelId, GhostBridgeAiLiterals.PROPERTY_PREFIX + ".model-id");
     }
 
     private static void validateProvider(String provider, String modelId, Aws aws) {
@@ -93,7 +121,7 @@ public record AiProperties(
             throw new IllegalArgumentException("ghostbridge.ai.provider must be one of " + PROVIDERS);
         }
         if (GhostBridgeAiLiterals.PROVIDER_OLLAMA.equals(provider) && modelId == null) {
-            throw new IllegalArgumentException("ghostbridge.ai.model-id is required when provider=ollama");
+            throw new IllegalArgumentException("ghostbridge.ai.model-id or the selected ghostbridge.ai.ollama.(local|cloud).model is required when provider=ollama");
         }
         if (GhostBridgeAiLiterals.PROVIDER_BEDROCK.equals(provider)) {
             if (modelId == null) {
@@ -171,80 +199,227 @@ public record AiProperties(
     }
 
     /**
-     * Ollama Cloud settings. The credential ({@code api-key}, normally mapped from the {@code OLLAMA_API_KEY}
-     * environment variable) is an {@link AiSecret}: it is masked in every string, JSON or log representation and is
-     * never part of any committed configuration. The destination is restricted to HTTPS on an allow-listed host with
-     * no user-info, query or fragment, and redirects are never followed by the provider.
+     * Ollama settings, selected centrally by {@code local-enabled}: {@code true} uses a self-hosted Ollama ({@code local.*},
+     * loopback or private network, no credential), {@code false} uses Ollama Cloud ({@code cloud.*}, https, credential
+     * required, paid). There is never a fallback from one to the other, and a paid cloud request is never the result of a
+     * missing or misspelled setting: when {@code provider=ollama} the mode must be unambiguous. It is taken, in order, from
+     * {@code local-enabled} or the legacy {@code mode}; failing both, it is inferred only as <em>local</em>, and only when
+     * {@code local.*} settings exist and no cloud setting does. Cloud therefore always needs an explicit
+     * {@code local-enabled=false} (or {@code mode=cloud}); anything undetermined fails startup.
+     *
+     * <p>Compatibility: the earlier flat keys {@code base-url}, {@code api-key}, {@code allowed-hosts} and {@code mode}
+     * remain accepted as aliases for the cloud settings; a pair that is set to different values fails startup. The
+     * credential ({@code cloud.api-key}, normally mapped from the {@code OLLAMA_API_KEY} environment variable) is an
+     * {@link AiSecret}: masked in every string, JSON or log representation and never part of committed configuration.
+     * Redirects are never followed by the provider. The flat {@code baseUrl}/{@code apiKey} components are derived: after
+     * construction they equal the values in {@code cloud}, and {@code mode} always mirrors {@code localEnabled}.
      */
     public record Ollama(
-            @DefaultValue("cloud") String mode,
-            @DefaultValue("https://ollama.com") String baseUrl,
+            Boolean localEnabled,
+            String mode,
+            String baseUrl,
             @DefaultValue("ollama.com") List<String> allowedHosts,
             AiSecret apiKey,
+            @Valid @NotNull @DefaultValue Local local,
+            @Valid @NotNull @DefaultValue Cloud cloud,
             @DefaultValue("5s") @NotNull Duration connectTimeout,
             @DefaultValue("262144") @Min(1024) @Max(8388608) int maxRequestBytes,
             @DefaultValue("1048576") @Min(1024) @Max(16777216) int maxResponseBytes) {
 
+        private static final int MIN_BODY_BYTES = 1024;
+        private static final String DEFAULT_CLOUD_URL =
+                GhostBridgeAiLiterals.URI_SCHEME_HTTPS + "://" + GhostBridgeAiLiterals.OLLAMA_CLOUD_DOMAIN;
+        private static final String PREFIX = GhostBridgeAiLiterals.PROPERTY_PREFIX + ".ollama.";
+        /** A plain host name or an IPv6 literal in brackets: no wildcard, trailing dot, port or path. */
+        private static final Pattern ALLOWED_HOST = Pattern.compile("[a-z0-9]([a-z0-9.-]*[a-z0-9])?|\\[[0-9a-f:.]+]");
+
         public Ollama {
-            mode = mode == null ? null : mode.trim().toLowerCase(Locale.ROOT);
-            if (!GhostBridgeAiLiterals.OLLAMA_MODE_CLOUD.equals(mode)) {
-                throw new IllegalArgumentException("ghostbridge.ai.ollama.mode must be 'cloud'");
+            // Boxed on purpose: a blank placeholder (for example GHOSTBRIDGE_AI_OLLAMA_LOCAL_ENABLED=) cannot bind to a
+            // primitive boolean, and "not set" must stay distinguishable from "false". After construction the value is
+            // null only when the mode could not be determined; AiProperties rejects that whenever provider=ollama.
+            allowedHosts = lowerCase(allowedHosts);
+            local = local == null ? new Local(null, null, null) : local;
+            cloud = cloud == null ? new Cloud(null, null, null) : cloud;
+            localEnabled = resolveSelection(localEnabled, mode, local, cloudSettingsPresent(baseUrl, apiKey, cloud));
+            mode = modeName(localEnabled);
+            if (baseUrl != null && baseUrl.isBlank()) {
+                throw new IllegalArgumentException(PREFIX + "base-url must not be blank");
             }
-            allowedHosts = allowedHosts == null ? List.of()
-                    : allowedHosts.stream().map(host -> host.trim().toLowerCase(Locale.ROOT)).toList();
-            apiKey = apiKey == null ? AiSecret.empty() : apiKey;
-            requirePositive(connectTimeout, "ghostbridge.ai.ollama.connect-timeout");
-            if (connectTimeout.compareTo(GhostBridgeAiLiterals.MAX_TIMEOUT) > 0) {
-                throw new IllegalArgumentException("ghostbridge.ai.ollama.connect-timeout must not exceed "
-                        + GhostBridgeAiLiterals.MAX_TIMEOUT);
-            }
-            baseUrl = baseUrl == null ? null : baseUrl.trim();
-            validateDestination(baseUrl, allowedHosts);
+            String resolvedUrl = pick(PREFIX + "base-url", PREFIX + "cloud.base-url", normalize(baseUrl), cloud.baseUrl());
+            baseUrl = resolvedUrl == null ? DEFAULT_CLOUD_URL : resolvedUrl;
+            apiKey = pickKey(apiKey, cloud.apiKey());
+            cloud = new Cloud(baseUrl, cloud.model(), apiKey);
+            requireTimeout(connectTimeout, PREFIX + "connect-timeout");
+            validateDestinations(baseUrl, allowedHosts, local, Boolean.TRUE.equals(localEnabled));
+            requireByteLimits(maxRequestBytes, maxResponseBytes);
+        }
+
+        private static boolean cloudSettingsPresent(String legacyBaseUrl, AiSecret legacyKey, Cloud cloud) {
+            return normalize(legacyBaseUrl) != null || isPresent(legacyKey)
+                    || cloud.baseUrl() != null || cloud.model() != null || isPresent(cloud.apiKey());
+        }
+
+        private static boolean isPresent(AiSecret secret) {
+            return secret != null && secret.isPresent();
+        }
+
+        private static void requireByteLimits(int maxRequestBytes, int maxResponseBytes) {
             if (maxRequestBytes < MIN_BODY_BYTES || maxResponseBytes < MIN_BODY_BYTES) {
-                throw new IllegalArgumentException("ghostbridge.ai.ollama byte limits must be at least " + MIN_BODY_BYTES);
+                throw new IllegalArgumentException(PREFIX + "byte limits must be at least " + MIN_BODY_BYTES);
+            }
+        }
+
+        /**
+         * Both destinations are validated whenever they are present, not only the selected one, so a bad value fails at
+         * startup instead of when the flag is flipped later. The default cloud destination is always valid.
+         */
+        private static void validateDestinations(String cloudUrl, List<String> cloudHosts, Local local, boolean localEnabled) {
+            OllamaEndpointValidator.validateCloud(cloudUrl, cloudHosts);
+            if (local.baseUrl() != null) {
+                OllamaEndpointValidator.validateLocal(local.baseUrl(), local.allowedHosts());
+            }
+            if (localEnabled && (local.baseUrl() == null || local.model() == null)) {
+                throw new IllegalArgumentException(PREFIX + "local.base-url and " + PREFIX + "local.model are required when local-enabled=true");
             }
         }
 
         /** A copy with the credential replaced (used to apply the environment fallback); all other values are re-validated. */
         public Ollama withApiKey(AiSecret key) {
-            return new Ollama(mode, baseUrl, allowedHosts, key, connectTimeout, maxRequestBytes, maxResponseBytes);
+            return new Ollama(localEnabled, mode, baseUrl, allowedHosts, key,
+                    local, new Cloud(cloud.baseUrl(), cloud.model(), key), connectTimeout, maxRequestBytes, maxResponseBytes);
         }
 
-        private static final int MIN_BODY_BYTES = 1024;
+        /** True when the mode has been determined (explicitly or by the unambiguous inference). */
+        public boolean isSelected() {
+            return localEnabled != null;
+        }
 
-        /** The validated chat-completions endpoint. Never contains credentials. */
+        /** True when the credential is needed (cloud mode); local mode never sends one. */
+        public boolean credentialRequired() {
+            return Boolean.FALSE.equals(localEnabled);
+        }
+
+        /** The model of the selected mode, or null when only the legacy {@code ghostbridge.ai.model-id} is set. */
+        public String selectedModel() {
+            return Boolean.TRUE.equals(localEnabled) ? local.model() : cloud.model();
+        }
+
+        /** Property name of the selected model setting, for messages. */
+        public String selectedModelProperty() {
+            return PREFIX + (Boolean.TRUE.equals(localEnabled) ? "local.model" : "cloud.model");
+        }
+
+        /** The validated chat-completions endpoint of the selected mode. Never contains credentials. */
         public URI chatCompletionsUri() {
-            String base = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+            if (!isSelected()) {
+                throw new IllegalStateException(PREFIX + "local-enabled is not set");
+            }
+            String selected = Boolean.TRUE.equals(localEnabled) ? local.baseUrl() : baseUrl;
+            String base = selected.endsWith("/") ? selected.substring(0, selected.length() - 1) : selected;
             try {
                 return new URI(base + GhostBridgeAiLiterals.OLLAMA_CHAT_COMPLETIONS_PATH);
             } catch (URISyntaxException e) {
-                throw new IllegalStateException("ghostbridge.ai.ollama.base-url is not a valid URI"); // never echo the URL
+                throw new IllegalStateException("The configured Ollama base-url is not a valid URI"); // never echo the URL
             }
         }
 
-        /** Messages deliberately omit the URL: a mistyped value could contain user-info credentials. */
-        private static void validateDestination(String baseUrl, List<String> allowedHosts) {
-            URI uri = parse(baseUrl);
-            boolean pathOk = uri.getRawPath() == null || uri.getRawPath().isEmpty() || "/".equals(uri.getRawPath());
-            boolean portOk = uri.getPort() == -1 || uri.getPort() == GhostBridgeAiLiterals.HTTPS_DEFAULT_PORT;
-            if (!GhostBridgeAiLiterals.URI_SCHEME_HTTPS.equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalArgumentException("ghostbridge.ai.ollama.base-url must use https");
+        /**
+         * Local, cloud or undetermined (null). An explicit flag wins; the legacy mode is an explicit choice as well; the
+         * two must agree. Without either, only <em>local</em> can be inferred (local settings present, no cloud setting),
+         * so a mistyped or missing flag falls into "undetermined" (rejected for provider=ollama) or local, and can never
+         * produce a paid cloud call by itself.
+         */
+        private static Boolean resolveSelection(Boolean flag, String mode, Local local, boolean cloudConfigured) {
+            Boolean fromMode = mode == null || mode.isBlank() ? null : parseMode(mode); // a blank placeholder counts as unset
+            if (flag != null && fromMode != null && !flag.equals(fromMode)) {
+                throw new IllegalArgumentException(PREFIX + "mode must match " + PREFIX + "local-enabled (local or cloud)");
             }
-            if (uri.getHost() == null || !allowedHosts.contains(uri.getHost().toLowerCase(Locale.ROOT))) {
-                throw new IllegalArgumentException("ghostbridge.ai.ollama.base-url host is not in ghostbridge.ai.ollama.allowed-hosts");
+            if (flag != null) {
+                return flag;
             }
-            if (uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null || !pathOk || !portOk) {
-                throw new IllegalArgumentException(
-                        "ghostbridge.ai.ollama.base-url must be a plain https origin (no user-info, path, query, fragment or custom port)");
+            if (fromMode != null) {
+                return fromMode;
             }
+            boolean localConfigured = local.baseUrl() != null || local.model() != null;
+            return localConfigured && !cloudConfigured ? Boolean.TRUE : null;
         }
 
-        private static URI parse(String baseUrl) {
-            try {
-                return new URI(baseUrl == null ? "" : baseUrl.trim());
-            } catch (URISyntaxException e) {
-                throw new IllegalArgumentException("ghostbridge.ai.ollama.base-url is not a valid URI");
+        private static String modeName(Boolean local) {
+            if (local == null) {
+                return null;
             }
+            return local ? GhostBridgeAiLiterals.OLLAMA_MODE_LOCAL : GhostBridgeAiLiterals.OLLAMA_MODE_CLOUD;
         }
+
+        private static Boolean parseMode(String mode) {
+            String normalized = mode.trim().toLowerCase(Locale.ROOT);
+            if (GhostBridgeAiLiterals.OLLAMA_MODE_LOCAL.equals(normalized)) {
+                return Boolean.TRUE;
+            }
+            if (GhostBridgeAiLiterals.OLLAMA_MODE_CLOUD.equals(normalized)) {
+                return Boolean.FALSE;
+            }
+            throw new IllegalArgumentException(PREFIX + "mode must be local or cloud");
+        }
+
+        private static List<String> lowerCase(List<String> hosts) {
+            if (hosts == null) {
+                return List.of();
+            }
+            return hosts.stream().map(Ollama::allowedHost).toList();
+        }
+
+        private static String allowedHost(String host) {
+            String normalized = host == null ? "" : host.trim().toLowerCase(Locale.ROOT);
+            if (!ALLOWED_HOST.matcher(normalized).matches()) {
+                throw new IllegalArgumentException(PREFIX + "allowed-hosts entries must be plain host names or IP literals "
+                        + "(no wildcard, trailing dot, port or path)");
+            }
+            return normalized;
+        }
+
+        private static String pick(String legacyName, String currentName, String legacy, String current) {
+            if (legacy != null && current != null && !legacy.equals(current)) {
+                throw new IllegalArgumentException(legacyName + " conflicts with " + currentName);
+            }
+            return current != null ? current : legacy;
+        }
+
+        private static AiSecret pickKey(AiSecret legacy, AiSecret current) {
+            boolean legacyPresent = legacy != null && legacy.isPresent();
+            boolean currentPresent = current != null && current.isPresent();
+            if (legacyPresent && currentPresent && !legacy.equals(current)) {
+                throw new IllegalArgumentException(PREFIX + "api-key conflicts with " + PREFIX + "cloud.api-key");
+            }
+            if (currentPresent) {
+                return current;
+            }
+            return legacyPresent ? legacy : AiSecret.empty();
+        }
+    }
+
+    /** Self-hosted Ollama. {@code allowedHosts} lists container or VPN host names the operator approves (http allowed). */
+    public record Local(String baseUrl, String model, @DefaultValue List<String> allowedHosts) {
+        public Local {
+            baseUrl = normalize(baseUrl);
+            model = validModel(model, Ollama.PREFIX + "local.model");
+            allowedHosts = Ollama.lowerCase(allowedHosts);
+        }
+    }
+
+    /** Ollama Cloud. Unset values resolve from the legacy flat keys or the defaults. */
+    public record Cloud(String baseUrl, String model, AiSecret apiKey) {
+        public Cloud {
+            baseUrl = normalize(baseUrl);
+            model = validModel(model, Ollama.PREFIX + "cloud.model");
+        }
+    }
+
+    private static String validModel(String model, String property) {
+        String normalized = normalize(model);
+        if (normalized != null && !MODEL_ID.matcher(normalized).matches()) {
+            throw new IllegalArgumentException(property + " is not a valid model identifier");
+        }
+        return normalized;
     }
 }

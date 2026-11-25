@@ -13,5 +13,6 @@
     <dependencies>
         <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-springboot-core</artifactId></dependency>
         <dependency><groupId>com.ghostbridge</groupId><artifactId>ghostbridge-ai-core</artifactId></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
     </dependencies>
 </project>

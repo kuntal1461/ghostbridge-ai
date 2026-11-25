@@ -52,3 +52,13 @@ No findings of Critical severity. No complexity above 10 was found in the review
 | CQ-04 | Documented (see SEC-M4-02). |
 | CQ-10, CQ-12 | **Fixed** (Javadoc corrected; meaningless assertion replaced with `isTrue`, which also exposed and fixed a request-replay stream bug: `getInputStream()` now returns one shared stream). |
 | CQ-05..09, 11, 13..17 | Open Low items (duplicated `@JsonAnySetter`/constraints, rounding helper, literals, test style). Not addressed in this milestone. |
+
+## Milestone 4 closure verification (2026-11-23, performed by Claude Code during GB-AI-004 Phase 1)
+Implementer-side verification, **not** an independent re-review.
+
+| Item | Result |
+|---|---|
+| CQ-01 (High) stray `ghostbridge-ai-module/src` | **Verified resolved.** `ls ghostbridge-ai-module` shows only `ghostbridge-ai-core`, `ghostbridge-ai-frontend`, `ghostbridge-ai-web`, `pom.xml`, `tasks`; `git status` was clean at the start of GB-AI-004. |
+| CQ-02, CQ-03, CQ-10, CQ-12 | Verified in source (message constant in `AiExceptionAdvice`; `SIZE_CODES` without `Max`; `isTrue()` assertion at `AiRequestBodyLimitFilterTest:73`). |
+| Remaining Low items CQ-05..09, 11, 13..17 | Unchanged and still Open (Low). Not part of GB-AI-004. |
+| Maven | `mvn -o -B clean verify` from the root: BUILD SUCCESS for all 10 reactor projects. |

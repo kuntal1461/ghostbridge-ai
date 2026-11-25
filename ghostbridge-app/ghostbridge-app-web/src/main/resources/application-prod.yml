@@ -1,0 +1,16 @@
+# Production behind a TLS-terminating reverse proxy on the same origin. Ollama runs on an internal network only.
+server:
+  forward-headers-strategy: native      # Tomcat RemoteIpValve: real client address and scheme, honoured only from the internal proxy network
+  tomcat:
+    remoteip:
+      internal-proxies: 10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}
+ghostbridge:
+  ai:
+    ollama:
+      local:
+        base-url: ${GHOSTBRIDGE_AI_OLLAMA_LOCAL_BASE_URL:http://ollama:11434}
+        allowed-hosts:
+          - ollama                      # the compose service name; http is accepted only for allow-listed or private hosts
+    budget:
+      max-tokens: ${GHOSTBRIDGE_AI_BUDGET_MAX_TOKENS:200000}
+      window: 1h

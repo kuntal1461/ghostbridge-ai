@@ -1,0 +1,9 @@
+{
+  "name": "ghostbridge",
+  "private": true,
+  "description": "npm workspace root: hoists React and the toolchain once for the two React projects so the App frontend can reuse the AI frontend without a second copy of React.",
+  "workspaces": [
+    "ghostbridge-ai-module/ghostbridge-ai-frontend",
+    "ghostbridge-app/ghostbridge-app-frontend"
+  ]
+}
